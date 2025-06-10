@@ -24,7 +24,7 @@ class Logger {
    * @param {string} level - LOG level (DEBUG, INFO, WARN, ERROR)
    */
   setLevel(level) {
-    if (this.LOG_LEVELS.hasOwnProperty(level)) {
+    if (Object.prototype.hasOwnProperty.call(this.LOG_LEVELS, level)) {
       this.currentLevel = this.LOG_LEVELS[level];
     }
   }
@@ -381,7 +381,7 @@ class Logger {
 }
 
 // Create global logger instance
-/* global logger */
-const logger = new Logger(); // eslint-disable-line no-undef
+// eslint-disable-next-line no-redeclare
+const logger = new Logger();
 
 // Global export for Google Apps Script

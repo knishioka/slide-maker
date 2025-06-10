@@ -174,7 +174,7 @@ class ContentService {
       alignment: 'CENTER'
     };
 
-    const textBox = this.slidesService.insertTextBox(
+    const _textBox = this.slidesService.insertTextBox(
       presentationId, slideIndex, title, position, style
     );
 
@@ -291,7 +291,7 @@ class ContentService {
       alignment: textItem.alignment || 'LEFT'
     };
 
-    const textBox = this.slidesService.insertTextBox(
+    const _textBox = this.slidesService.insertTextBox(
       presentationId, slideIndex, validation.sanitized.text, position, style
     );
 
@@ -322,7 +322,7 @@ class ContentService {
     const position = imageItem.position || 
       this.calculateContentPosition(slideDimensions, layout, elementIndex, 'image');
 
-    const image = this.slidesService.insertImage(
+    const _image = this.slidesService.insertImage(
       presentationId, slideIndex, validation.sanitized.source, position
     );
 
@@ -357,7 +357,7 @@ class ContentService {
     const rows = validation.sanitized.length;
     const columns = Math.max(...validation.sanitized.map(row => row.length));
 
-    const table = this.slidesService.insertTable(
+    const _table = this.slidesService.insertTable(
       presentationId, slideIndex, rows, columns, position, validation.sanitized
     );
 
@@ -390,7 +390,7 @@ class ContentService {
       this.calculateContentPosition(slideDimensions, layout, elementIndex, 'diagram');
 
     const svgContent = await this.convertMermaidToSVG(validation.sanitized);
-    const image = this.slidesService.insertSVG(presentationId, slideIndex, svgContent, position);
+    const _image = this.slidesService.insertSVG(presentationId, slideIndex, svgContent, position);
 
     return {
       type: 'mermaid',
@@ -418,7 +418,7 @@ class ContentService {
     const position = svgItem.position || 
       this.calculateContentPosition(slideDimensions, layout, elementIndex, 'diagram');
 
-    const image = this.slidesService.insertSVG(
+    const _image = this.slidesService.insertSVG(
       presentationId, slideIndex, validation.sanitized, position
     );
 

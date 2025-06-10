@@ -215,7 +215,7 @@ class SlidesService {
   getSlideDimensions(presentationId) {
     return this.executeWithRetry(() => {
       const presentation = this.openPresentation(presentationId);
-      const pageSize = presentation.getPageWidth();
+      const _pageSize = presentation.getPageWidth();
       return {
         width: presentation.getPageWidth(),
         height: presentation.getPageHeight()
@@ -253,7 +253,7 @@ class SlidesService {
    */
   calculateLayoutPosition(layoutType, slideDimensions, elementIndex) {
     const margin = 60;
-    const { width, height } = slideDimensions;
+    const { width, height: _height } = slideDimensions;
     
     if (layoutType === 'single') {
       return {
@@ -284,6 +284,7 @@ class SlidesService {
    * Delete slide
    * @param {string} presentationId - Presentation ID
    * @param {number} slideIndex - Slide index to delete
+   * @returns {void}
    */
   deleteSlide(presentationId, slideIndex) {
     return this.executeWithRetry(() => {

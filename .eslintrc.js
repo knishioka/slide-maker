@@ -31,6 +31,7 @@ module.exports = {
     expect: 'readonly',
     beforeEach: 'readonly',
     afterEach: 'readonly',
+    jest: 'readonly',
     
     // Custom globals for this project
     SlidesService: 'readonly',
@@ -60,7 +61,7 @@ module.exports = {
     // Function and naming conventions
     'camelcase': ['error', { properties: 'never' }],
     'func-names': 'off',
-    'function-paren-newline': ['error', 'multiline-arguments'],
+    'function-paren-newline': ['error', 'consistent'],
     
     // Object and array formatting
     'object-curly-spacing': ['error', 'always'],
