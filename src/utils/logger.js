@@ -13,7 +13,7 @@ class Logger {
       WARN: 1,
       ERROR: 0
     };
-    
+
     this.currentLevel = this.LOG_LEVELS.INFO;
     this.logSheetName = 'ApplicationLog';
     this.maxLogEntries = 1000;
@@ -34,9 +34,7 @@ class Logger {
    * @returns {string} Current log level
    */
   getCurrentLevel() {
-    return Object.keys(this.LOG_LEVELS).find(
-      key => this.LOG_LEVELS[key] === this.currentLevel
-    );
+    return Object.keys(this.LOG_LEVELS).find(key => this.LOG_LEVELS[key] === this.currentLevel);
   }
 
   /**
@@ -48,7 +46,7 @@ class Logger {
    */
   log(level, message, data = null, error = null) {
     const levelValue = this.LOG_LEVELS[level];
-    
+
     if (levelValue > this.currentLevel) {
       return;
     }
@@ -65,7 +63,7 @@ class Logger {
 
     try {
       console.log(`[${timestamp}] ${level}: ${message}`, data);
-      
+
       if (levelValue <= this.LOG_LEVELS.WARN) {
         this.writeToSheet(logEntry);
       }
@@ -120,7 +118,7 @@ class Logger {
   time(operation, fn) {
     const startTime = Date.now();
     this.debug(`Starting operation: ${operation}`);
-    
+
     try {
       const result = fn();
       const duration = Date.now() - startTime;
@@ -141,7 +139,7 @@ class Logger {
     try {
       const spreadsheet = this.getOrCreateLogSpreadsheet();
       const sheet = this.getOrCreateLogSheet(spreadsheet);
-      
+
       const rowData = [
         logEntry.timestamp,
         logEntry.level,
@@ -150,9 +148,9 @@ class Logger {
         logEntry.error ? JSON.stringify(logEntry.error) : '',
         logEntry.executionId
       ];
-      
+
       sheet.appendRow(rowData);
-      
+
       this.maintainLogSize(sheet);
     } catch (sheetError) {
       console.error('Failed to write to log sheet:', sheetError);
@@ -166,12 +164,12 @@ class Logger {
   getOrCreateLogSpreadsheet() {
     const fileName = 'SlideMaker_ApplicationLog';
     const files = DriveApp.getFilesByName(fileName);
-    
+
     if (files.hasNext()) {
       const file = files.next();
       return SpreadsheetApp.openById(file.getId());
     }
-    
+
     const spreadsheet = SpreadsheetApp.create(fileName);
     this.initializeLogSheet(spreadsheet.getActiveSheet());
     return spreadsheet;
@@ -190,12 +188,12 @@ class Logger {
       sheet = spreadsheet.insertSheet(this.logSheetName);
       this.initializeLogSheet(sheet);
     }
-    
+
     if (!sheet) {
       sheet = spreadsheet.insertSheet(this.logSheetName);
       this.initializeLogSheet(sheet);
     }
-    
+
     return sheet;
   }
 
@@ -206,10 +204,10 @@ class Logger {
   initializeLogSheet(sheet) {
     const headers = ['Timestamp', 'Level', 'Message', 'Data', 'Error', 'Execution ID'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    
+
     sheet.setFrozenRows(1);
     sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
-    
+
     const headerRange = sheet.getRange(1, 1, 1, headers.length);
     headerRange.setBackground('#f0f0f0');
   }
@@ -220,7 +218,7 @@ class Logger {
    */
   maintainLogSize(sheet) {
     const numRows = sheet.getLastRow();
-    
+
     if (numRows > this.maxLogEntries + 1) {
       const rowsToDelete = numRows - this.maxLogEntries;
       sheet.deleteRows(2, rowsToDelete);
@@ -236,22 +234,22 @@ class Logger {
     if (!data) {
       return data;
     }
-    
+
     const sensitiveKeys = ['password', 'token', 'key', 'secret', 'credential'];
-    
+
     if (typeof data === 'object') {
       const sanitized = {};
-      
+
       for (const [key, value] of Object.entries(data)) {
         const lowerKey = key.toLowerCase();
         const isSensitive = sensitiveKeys.some(sensitive => lowerKey.includes(sensitive));
-        
+
         sanitized[key] = isSensitive ? '[REDACTED]' : value;
       }
-      
+
       return sanitized;
     }
-    
+
     return data;
   }
 
@@ -277,22 +275,22 @@ class Logger {
   createPerformanceMonitor(functionName) {
     const startTime = Date.now();
     const startMemory = this.getMemoryUsage();
-    
+
     return {
       start: () => {
         this.debug(`Performance monitor started: ${functionName}`);
       },
-      
+
       end: () => {
         const duration = Date.now() - startTime;
         const endMemory = this.getMemoryUsage();
         const memoryDelta = endMemory - startMemory;
-        
+
         this.info(`Performance monitor completed: ${functionName}`, {
           duration: `${duration}ms`,
           memoryUsed: `${memoryDelta}MB`
         });
-        
+
         return { duration, memoryDelta };
       }
     };
@@ -319,11 +317,11 @@ class Logger {
     try {
       const spreadsheet = this.getOrCreateLogSpreadsheet();
       const sheet = this.getOrCreateLogSheet(spreadsheet);
-      
+
       if (sheet.getLastRow() > 1) {
         sheet.deleteRows(2, sheet.getLastRow() - 1);
       }
-      
+
       this.info('All logs cleared');
       return true;
     } catch (error) {
@@ -341,17 +339,17 @@ class Logger {
     try {
       const spreadsheet = this.getOrCreateLogSpreadsheet();
       const sheet = this.getOrCreateLogSheet(spreadsheet);
-      
+
       const lastRow = sheet.getLastRow();
       if (lastRow <= 1) {
         return [];
       }
-      
+
       const startRow = Math.max(2, lastRow - count + 1);
       const numRows = lastRow - startRow + 1;
-      
+
       const values = sheet.getRange(startRow, 1, numRows, 6).getValues();
-      
+
       return values.map(row => ({
         timestamp: row[0],
         level: row[1],

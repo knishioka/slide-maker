@@ -63,9 +63,12 @@ class SlidesService {
   addSlide(presentationId, layoutType = 'BLANK') {
     return this.executeWithRetry(() => {
       const presentation = this.openPresentation(presentationId);
-      const layout = presentation.getLayouts().find(l => 
-        l.getLayoutType() === SlidesApp.PredefinedLayout[layoutType]) || presentation.getLayouts()[0];
-      
+      const layout =
+        presentation
+          .getLayouts()
+          .find(l => l.getLayoutType() === SlidesApp.PredefinedLayout[layoutType]) ||
+        presentation.getLayouts()[0];
+
       return presentation.appendSlide(layout);
     });
   }
@@ -83,11 +86,17 @@ class SlidesService {
     return this.executeWithRetry(() => {
       const presentation = this.openPresentation(presentationId);
       const slide = presentation.getSlides()[slideIndex];
-      
-      const textBox = slide.insertTextBox(text, position.x, position.y, position.width, position.height);
-      
+
+      const textBox = slide.insertTextBox(
+        text,
+        position.x,
+        position.y,
+        position.width,
+        position.height
+      );
+
       this.applyTextStyle(textBox, style);
-      
+
       return textBox;
     });
   }
@@ -136,14 +145,26 @@ class SlidesService {
     return this.executeWithRetry(() => {
       const presentation = this.openPresentation(presentationId);
       const slide = presentation.getSlides()[slideIndex];
-      
+
       let image;
       if (typeof imageSource === 'string') {
-        image = slide.insertImage(imageSource, position.x, position.y, position.width, position.height);
+        image = slide.insertImage(
+          imageSource,
+          position.x,
+          position.y,
+          position.width,
+          position.height
+        );
       } else {
-        image = slide.insertImage(imageSource, position.x, position.y, position.width, position.height);
+        image = slide.insertImage(
+          imageSource,
+          position.x,
+          position.y,
+          position.width,
+          position.height
+        );
       }
-      
+
       return image;
     });
   }
@@ -162,13 +183,20 @@ class SlidesService {
     return this.executeWithRetry(() => {
       const presentation = this.openPresentation(presentationId);
       const slide = presentation.getSlides()[slideIndex];
-      
-      const table = slide.insertTable(rows, columns, position.x, position.y, position.width, position.height);
-      
+
+      const table = slide.insertTable(
+        rows,
+        columns,
+        position.x,
+        position.y,
+        position.width,
+        position.height
+      );
+
       if (data.length > 0) {
         this.fillTableData(table, data);
       }
-      
+
       return table;
     });
   }
@@ -197,7 +225,7 @@ class SlidesService {
   insertSVG(presentationId, slideIndex, svgContent, position) {
     return this.executeWithRetry(() => {
       const tempFile = DriveApp.createFile('temp.svg', svgContent, 'image/svg+xml');
-      
+
       try {
         const image = this.insertImage(presentationId, slideIndex, tempFile.getBlob(), position);
         return image;
@@ -234,13 +262,13 @@ class SlidesService {
     const baseSize = 24;
     const standardWidth = 960;
     const standardHeight = 540;
-    
+
     const widthFactor = slideWidth / standardWidth;
     const heightFactor = slideHeight / standardHeight;
     const scaleFactor = Math.min(widthFactor, heightFactor);
-    
+
     const lengthAdjustment = Math.max(0.8, 1 - (textLength / 1000) * 0.2);
-    
+
     return Math.round(baseSize * scaleFactor * lengthAdjustment);
   }
 
@@ -254,29 +282,29 @@ class SlidesService {
   calculateLayoutPosition(layoutType, slideDimensions, elementIndex) {
     const margin = 60;
     const { width, height: _height } = slideDimensions;
-    
+
     if (layoutType === 'single') {
       return {
         x: margin,
-        y: margin + (elementIndex * 100),
-        width: width - (margin * 2),
+        y: margin + elementIndex * 100,
+        width: width - margin * 2,
         height: 80
       };
     }
-    
+
     if (layoutType === 'double') {
-      const columnWidth = (width - (margin * 3)) / 2;
+      const columnWidth = (width - margin * 3) / 2;
       const column = elementIndex % 2;
       const row = Math.floor(elementIndex / 2);
-      
+
       return {
-        x: margin + (column * (columnWidth + margin)),
-        y: margin + (row * 100),
+        x: margin + column * (columnWidth + margin),
+        y: margin + row * 100,
         width: columnWidth,
         height: 80
       };
     }
-    
+
     throw new Error(`Unsupported layout type: ${layoutType}`);
   }
 
@@ -290,7 +318,7 @@ class SlidesService {
     return this.executeWithRetry(() => {
       const presentation = this.openPresentation(presentationId);
       const slides = presentation.getSlides();
-      
+
       if (slideIndex >= 0 && slideIndex < slides.length) {
         slides[slideIndex].remove();
       }
@@ -305,7 +333,7 @@ class SlidesService {
   getPresentationInfo(presentationId) {
     return this.executeWithRetry(() => {
       const presentation = this.openPresentation(presentationId);
-      
+
       return {
         id: presentation.getId(),
         name: presentation.getName(),

@@ -19,15 +19,26 @@ class ValidationService {
     };
 
     this.ALLOWED_FONTS = [
-      'Arial', 'Calibri', 'Helvetica', 'Times New Roman', 
-      'Georgia', 'Verdana', 'Tahoma', 'Trebuchet MS'
+      'Arial',
+      'Calibri',
+      'Helvetica',
+      'Times New Roman',
+      'Georgia',
+      'Verdana',
+      'Tahoma',
+      'Trebuchet MS'
     ];
 
     this.ALLOWED_LAYOUTS = ['single', 'double', 'custom'];
-    
+
     this.MERMAID_TYPES = [
-      'flowchart', 'sequenceDiagram', 'classDiagram', 
-      'stateDiagram', 'erDiagram', 'gantt', 'pie'
+      'flowchart',
+      'sequenceDiagram',
+      'classDiagram',
+      'stateDiagram',
+      'erDiagram',
+      'gantt',
+      'pie'
     ];
   }
 
@@ -77,7 +88,9 @@ class ValidationService {
     if (content.text && typeof content.text !== 'string') {
       errors.push('Text content must be a string');
     } else if (content.text && content.text.length > this.SLIDE_CONSTRAINTS.MAX_TEXT_LENGTH) {
-      errors.push(`Text content must be ${this.SLIDE_CONSTRAINTS.MAX_TEXT_LENGTH} characters or less`);
+      errors.push(
+        `Text content must be ${this.SLIDE_CONSTRAINTS.MAX_TEXT_LENGTH} characters or less`
+      );
     }
 
     if (content.layout && !this.ALLOWED_LAYOUTS.includes(content.layout)) {
@@ -90,8 +103,14 @@ class ValidationService {
 
     if (content.fontSize) {
       const fontSize = parseFloat(content.fontSize);
-      if (isNaN(fontSize) || fontSize < this.SLIDE_CONSTRAINTS.MIN_FONT_SIZE || fontSize > this.SLIDE_CONSTRAINTS.MAX_FONT_SIZE) {
-        errors.push(`Font size must be between ${this.SLIDE_CONSTRAINTS.MIN_FONT_SIZE} and ${this.SLIDE_CONSTRAINTS.MAX_FONT_SIZE} points`);
+      if (
+        isNaN(fontSize) ||
+        fontSize < this.SLIDE_CONSTRAINTS.MIN_FONT_SIZE ||
+        fontSize > this.SLIDE_CONSTRAINTS.MAX_FONT_SIZE
+      ) {
+        errors.push(
+          `Font size must be between ${this.SLIDE_CONSTRAINTS.MIN_FONT_SIZE} and ${this.SLIDE_CONSTRAINTS.MAX_FONT_SIZE} points`
+        );
       }
     }
 
@@ -174,9 +193,9 @@ class ValidationService {
         errors.push(`Row ${rowIndex} must be an array`);
         return;
       }
-      
+
       maxColumns = Math.max(maxColumns, row.length);
-      
+
       row.forEach((cell, cellIndex) => {
         if (typeof cell !== 'string' && typeof cell !== 'number') {
           warnings.push(`Cell at row ${rowIndex}, column ${cellIndex} will be converted to string`);
@@ -192,8 +211,7 @@ class ValidationService {
       warnings.push('Tables with more than 20 rows may not display well on slides');
     }
 
-    const sanitized = tableData.map(row => 
-      row.map(cell => this.sanitizeText(String(cell))));
+    const sanitized = tableData.map(row => row.map(cell => this.sanitizeText(String(cell))));
 
     return {
       isValid: errors.length === 0,
@@ -223,9 +241,8 @@ class ValidationService {
 
     const trimmedCode = mermaidCode.trim();
     const firstLine = trimmedCode.split('\n')[0].toLowerCase();
-    
-    const hasValidType = this.MERMAID_TYPES.some(type => 
-      firstLine.includes(type.toLowerCase()));
+
+    const hasValidType = this.MERMAID_TYPES.some(type => firstLine.includes(type.toLowerCase()));
 
     if (!hasValidType) {
       warnings.push('Mermaid diagram type not explicitly declared or not recognized');
@@ -314,12 +331,11 @@ class ValidationService {
     if (!position || typeof position !== 'object') {
       return false;
     }
-    
+
     const requiredKeys = ['x', 'y', 'width', 'height'];
-    return requiredKeys.every(key => 
-      typeof position[key] === 'number' && 
-      !isNaN(position[key]) && 
-      position[key] >= 0);
+    return requiredKeys.every(
+      key => typeof position[key] === 'number' && !isNaN(position[key]) && position[key] >= 0
+    );
   }
 
   /**
@@ -359,7 +375,7 @@ class ValidationService {
     if (typeof text !== 'string') {
       return '';
     }
-    
+
     return text
       .replace(/<[^>]*>/g, '')
       .replace(/&lt;/g, '<')
@@ -377,38 +393,42 @@ class ValidationService {
    */
   sanitizeSlideContent(content) {
     const sanitized = {};
-    
+
     if (content.text) {
       sanitized.text = this.sanitizeText(content.text);
     }
-    
+
     if (content.title) {
       sanitized.title = this.sanitizeText(content.title);
     }
-    
+
     if (content.layout && this.ALLOWED_LAYOUTS.includes(content.layout)) {
       sanitized.layout = content.layout;
     }
-    
+
     if (content.fontFamily && this.ALLOWED_FONTS.includes(content.fontFamily)) {
       sanitized.fontFamily = content.fontFamily;
     }
-    
+
     if (content.fontSize) {
       const fontSize = parseFloat(content.fontSize);
-      if (!isNaN(fontSize) && fontSize >= this.SLIDE_CONSTRAINTS.MIN_FONT_SIZE && fontSize <= this.SLIDE_CONSTRAINTS.MAX_FONT_SIZE) {
+      if (
+        !isNaN(fontSize) &&
+        fontSize >= this.SLIDE_CONSTRAINTS.MIN_FONT_SIZE &&
+        fontSize <= this.SLIDE_CONSTRAINTS.MAX_FONT_SIZE
+      ) {
         sanitized.fontSize = fontSize;
       }
     }
-    
+
     if (content.color && this.isValidColor(content.color)) {
       sanitized.color = content.color;
     }
-    
+
     if (content.position && this.isValidPosition(content.position)) {
       sanitized.position = content.position;
     }
-    
+
     return sanitized;
   }
 

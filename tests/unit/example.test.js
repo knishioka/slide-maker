@@ -63,7 +63,7 @@ describe('Layout Logic', () => {
   const calculatePosition = (index, itemsPerRow, itemWidth, itemHeight) => {
     const row = Math.floor(index / itemsPerRow);
     const col = index % itemsPerRow;
-    
+
     return {
       x: col * itemWidth,
       y: row * itemHeight,
