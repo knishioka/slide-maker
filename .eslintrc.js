@@ -1,17 +1,12 @@
 module.exports = {
   env: {
     es2021: true,
-    googleappsscript: true,
     browser: true,
     node: true
   },
   extends: [
     'eslint:recommended',
-    'plugin:googleappsscript/recommended',
     'prettier'
-  ],
-  plugins: [
-    'googleappsscript'
   ],
   parserOptions: {
     ecmaVersion: 2021,
@@ -35,6 +30,8 @@ module.exports = {
     expect: 'readonly',
     beforeEach: 'readonly',
     afterEach: 'readonly',
+    jest: 'readonly',
+    global: 'readonly',
     
     // Custom globals for this project
     SlideGenerator: 'readonly',
