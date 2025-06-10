@@ -1,12 +1,17 @@
 module.exports = {
   env: {
     es2021: true,
+    googleappsscript: true,
     browser: true,
     node: true
   },
   extends: [
     'eslint:recommended',
+    'plugin:googleappsscript/recommended',
     'prettier'
+  ],
+  plugins: [
+    'googleappsscript'
   ],
   parserOptions: {
     ecmaVersion: 2021,
@@ -16,7 +21,6 @@ module.exports = {
     // Google Apps Script global objects
     SlidesApp: 'readonly',
     DriveApp: 'readonly',
-    SpreadsheetApp: 'readonly',
     PropertiesService: 'readonly',
     Utilities: 'readonly',
     UrlFetchApp: 'readonly',
@@ -31,14 +35,12 @@ module.exports = {
     expect: 'readonly',
     beforeEach: 'readonly',
     afterEach: 'readonly',
-    jest: 'readonly',
     
     // Custom globals for this project
-    SlidesService: 'readonly',
+    SlideGenerator: 'readonly',
+    LayoutService: 'readonly',
     ContentService: 'readonly',
-    ValidationService: 'readonly',
-    logger: 'readonly',
-    Logger: 'readonly'
+    MermaidService: 'readonly'
   },
   rules: {
     // Google Apps Script specific rules
@@ -50,7 +52,7 @@ module.exports = {
     // Code quality rules
     'no-unused-vars': ['error', { 
       argsIgnorePattern: '^_',
-      varsIgnorePattern: '^_|^[A-Z].*Service$|^create|^add|^apply|^validate|^get|^generate|^convert|^batch|^set|^logger$' 
+      varsIgnorePattern: '^_' 
     }],
     'no-console': 'off', // console.log is valid in GAS
     'no-undef': 'error',
@@ -61,7 +63,7 @@ module.exports = {
     // Function and naming conventions
     'camelcase': ['error', { properties: 'never' }],
     'func-names': 'off',
-    'function-paren-newline': ['error', 'consistent'],
+    'function-paren-newline': ['error', 'multiline-arguments'],
     
     // Object and array formatting
     'object-curly-spacing': ['error', 'always'],

@@ -188,7 +188,7 @@ class TestRunner {
     
     if (testFiles.length === 0) {
       console.log(`⚠️  No test files found in tests/${testType}/`);
-      console.log('💡 Create test files with .test.js extension in that directory');
+      console.log(`💡 Create test files with .test.js extension in that directory`);
       return;
     }
 
@@ -212,7 +212,7 @@ class TestRunner {
    */
   printResults() {
     console.log('\n' + '='.repeat(50));
-    console.log('📊 Test Results Summary');
+    console.log(`📊 Test Results Summary`);
     console.log('='.repeat(50));
     console.log(`Total Tests: ${this.testResults.total}`);
     console.log(`✅ Passed: ${this.testResults.passed}`);
