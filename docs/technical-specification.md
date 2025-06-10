@@ -3,12 +3,17 @@
 ## 1. プロジェクト概要
 
 ### 1.1 目的
-Google Slideでシンプルなコンテンツを自動生成するサービスを開発する。ダブルカラム・シングルカラムレイアウト、SVG・Mermaid図の挿入、フォント・カラーテーマの制御を可能にする。
+Google Apps Scriptベースで Google Slides コンテンツを自動生成するWebサービス。ダブルカラム・シングルカラムレイアウト、SVG・Mermaid図の挿入、フォント・カラーテーマの制御を提供する。
 
-### 1.2 技術的目標
+### 1.2 現在の実装状況 (2025年6月)
+- **✅ 完了**: プロジェクト設計、開発環境構築、ドキュメント作成
+- **🔄 実装中**: Core Services、Layout Engine、Web Interface
+- **📋 計画中**: Mermaid統合、パフォーマンス最適化、セキュリティ強化
+
+### 1.3 技術的目標
 - プログラムによる適切なフォントサイズと余白の制御
-- 技術的負債の排除
-- 包括的なテスト・Lintカバレッジ
+- Git Worktree による並行開発戦略の実装
+- 包括的なテスト・Lintカバレッジ (目標85%以上)
 - 将来的なGoogle Spreadsheet連携の準備
 
 ## 2. 技術アーキテクチャ
@@ -63,42 +68,51 @@ Google Slideでシンプルなコンテンツを自動生成するサービス�
   - 文字間: フォントサイズの0.12倍以上
 - **カラーテーマ**: プログラマティックな色設定
 
-## 4. 実装詳細
+## 4. 実装計画 (Git Worktree戦略)
 
-### 4.1 Google Slides API 活用
-```javascript
-// 基本的なスライド操作
-const presentation = SlidesApp.getActivePresentation();
-const slide = presentation.getSlides()[0];
-
-// テキストボックス挿入
-const textBox = slide.insertTextBox("Sample Text");
-textBox.getTextStyle()
-  .setForegroundColor("#000000")
-  .setFontFamily("Arial")
-  .setFontSize(24);
-
-// 図形挿入とスタイリング
-const shape = slide.insertShape(SlidesApp.ShapeType.RECTANGLE);
-shape.getFill().setSolidFill("#ffffff");
+### 4.1 並行開発アーキテクチャ
+```bash
+# 3並列 Worktree開発
+├── main/ (メインブランチ)
+├── ../slide-maker-core-services/   # Core Services実装
+├── ../slide-maker-layout/          # Layout Engine実装
+└── ../slide-maker-ui/              # Web Interface実装
 ```
 
-### 4.2 Mermaid図生成フロー
+### 4.2 実装対象ファイル
 ```javascript
-// Mermaid → SVG 変換フロー
-function insertMermaidDiagram(slideId, mermaidCode) {
-  // 1. Mermaid API でSVG生成
-  const svgContent = convertMermaidToSVG(mermaidCode);
+// Phase 1: Core Services (優先度: High)
+src/services/slides.js      // Google Slides API wrapper - 未実装
+src/services/content.js     // コンテンツ処理 - 未実装
+src/utils/logger.js         // ログシステム - 未実装
+src/utils/validation.js     // 入力検証 - 未実装
+
+// Phase 2: Layout Engine (優先度: High)
+src/services/layout.js      // レイアウト管理 - 未実装
+src/utils/design.js         // デザイン計算 - 未実装
+
+// Phase 3: Web Interface (優先度: Medium)
+src/web/index.html          // メインUI - 未実装
+src/web/style.css           // スタイルシート - 未実装
+src/web/script.js           // クライアントJS - 未実装
+src/main.js                 // エントリーポイント - 未実装
+```
+
+### 4.3 Mermaid統合計画 (Phase 3)
+```javascript
+// 実装予定: src/services/mermaid.js
+class MermaidService {
+  // API設定 (appsscript.jsonで許可済み)
+  // - https://mermaid.live/
+  // - https://kroki.io/
   
-  // 2. SVGをGoogle Driveに一時保存
-  const tempFile = DriveApp.createFile('temp.svg', svgContent, 'image/svg+xml');
+  async convertToSVG(mermaidCode) {
+    // 実装予定: Mermaid Live APIを使用
+  }
   
-  // 3. スライドに画像として挿入
-  const slide = SlidesApp.openById(slideId);
-  slide.insertImage(tempFile.getBlob());
-  
-  // 4. 一時ファイル削除
-  DriveApp.getFileById(tempFile.getId()).setTrashed(true);
+  async insertDiagram(slide, mermaidCode, position) {
+    // 実装予定: SVG→一時ファイル→スライド挿入
+  }
 }
 ```
 
@@ -120,11 +134,17 @@ function calculateOptimalFontSize(slideWidth, slideHeight, textLength) {
 
 ## 5. 開発・デプロイメント戦略
 
-### 5.1 開発環境
-- **ローカル開発**: clasp + VS Code
-- **バージョン管理**: Git workflow (feature → develop → main)
-- **テスト環境**: 開発用GASプロジェクト
-- **本番環境**: 本番用GASプロジェクト
+### 5.1 Git Worktree分散開発
+- **並行開発**: 3チーム同時実装 (Core/Layout/UI)
+- **バージョン管理**: Git Worktree + feature branch戦略
+- **統合**: 週次でmainブランチにマージ
+- **品質管理**: 並行テスト実装 (../slide-maker-testing)
+
+### 5.2 開発環境
+- **ローカル開発**: clasp + VS Code + asdf (Node.js管理)
+- **テスト環境**: 独自テストランナー (tests/runner.js)
+- **Lint**: ESLint + Prettier + pre-commit hooks
+- **本番環境**: Google Apps Script (clasp deploy)
 
 ### 5.2 CI/CD パイプライン
 ```yaml
@@ -168,6 +188,8 @@ jobs:
 ### 6.3 パフォーマンス目標
 - スライド生成時間: 5秒以内
 - API呼び出し制限: Google Quotaの80%以内
+- テストカバレッジ: 85%以上
+- 全テスト実行時間: 5分以内
 - エラー率: 1%以下
 
 ## 7. 将来拡張計画
