@@ -1,17 +1,12 @@
 module.exports = {
   env: {
     es2021: true,
-    googleappsscript: true,
     browser: true,
     node: true
   },
   extends: [
     'eslint:recommended',
-    'plugin:googleappsscript/recommended',
     'prettier'
-  ],
-  plugins: [
-    'googleappsscript'
   ],
   parserOptions: {
     ecmaVersion: 2021,
@@ -21,6 +16,7 @@ module.exports = {
     // Google Apps Script global objects
     SlidesApp: 'readonly',
     DriveApp: 'readonly',
+    SpreadsheetApp: 'readonly',
     PropertiesService: 'readonly',
     Utilities: 'readonly',
     UrlFetchApp: 'readonly',
@@ -37,10 +33,11 @@ module.exports = {
     afterEach: 'readonly',
     
     // Custom globals for this project
-    SlideGenerator: 'readonly',
-    LayoutService: 'readonly',
+    SlidesService: 'readonly',
     ContentService: 'readonly',
-    MermaidService: 'readonly'
+    ValidationService: 'readonly',
+    logger: 'readonly',
+    Logger: 'readonly'
   },
   rules: {
     // Google Apps Script specific rules
