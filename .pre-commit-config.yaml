@@ -1,0 +1,60 @@
+repos:
+  # ESLint and Prettier for JavaScript
+  - repo: local
+    hooks:
+      - id: eslint
+        name: ESLint
+        entry: npx eslint
+        language: node
+        files: \.(js)$
+        args: [--fix]
+        
+      - id: prettier
+        name: Prettier
+        entry: npx prettier
+        language: node
+        files: \.(js|json|md|html|css)$
+        args: [--write]
+        
+      - id: run-tests
+        name: Run Tests
+        entry: npm run test
+        language: node
+        pass_filenames: false
+        stages: [commit]
+        
+  # Generic hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.(md)$
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-case-conflict
+      
+  # Security checks
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: package-lock.json
+        
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+    
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false

@@ -1,0 +1,19 @@
+{
+  "scriptId": "",
+  "rootDir": "./src",
+  "projectId": "",
+  "fileExtension": "js",
+  "filePushOrder": [
+    "main.js",
+    "services/slides.js",
+    "services/layout.js", 
+    "services/content.js",
+    "services/mermaid.js",
+    "utils/design.js",
+    "utils/validation.js",
+    "utils/logger.js",
+    "web/index.html",
+    "web/style.css",
+    "web/script.js"
+  ]
+}

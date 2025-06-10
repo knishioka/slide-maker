@@ -1,0 +1,152 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [16, 18, 20]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run ESLint
+      run: npm run lint
+      
+    - name: Check Prettier formatting
+      run: npm run format:check
+      
+    - name: Run tests
+      run: npm run test
+      
+    - name: Upload test coverage
+      if: matrix.node-version == '18'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        fail_ci_if_error: true
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  deploy-development:
+    needs: [lint-and-test, security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Setup clasp credentials
+      run: |
+        echo "$CLASP_CREDENTIALS" > ~/.clasprc.json
+        echo "$CLASP_PROJECT" > .clasp.json
+      env:
+        CLASP_CREDENTIALS: ${{ secrets.CLASP_CREDENTIALS_DEV }}
+        CLASP_PROJECT: ${{ secrets.CLASP_PROJECT_DEV }}
+        
+    - name: Install clasp
+      run: npm install -g @google/clasp
+      
+    - name: Deploy to development
+      run: |
+        clasp push
+        clasp deploy --deploymentId ${{ secrets.DEPLOYMENT_ID_DEV }} --description "Auto-deploy from develop branch - ${{ github.sha }}"
+
+  deploy-production:
+    needs: [lint-and-test, security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build for production
+      run: npm run build
+      
+    - name: Setup clasp credentials
+      run: |
+        echo "$CLASP_CREDENTIALS" > ~/.clasprc.json
+        echo "$CLASP_PROJECT" > .clasp.json
+      env:
+        CLASP_CREDENTIALS: ${{ secrets.CLASP_CREDENTIALS_PROD }}
+        CLASP_PROJECT: ${{ secrets.CLASP_PROJECT_PROD }}
+        
+    - name: Install clasp
+      run: npm install -g @google/clasp
+      
+    - name: Create version and deploy to production
+      run: |
+        clasp push
+        VERSION=$(clasp version "Production release - ${{ github.sha }}" | grep -o '[0-9]*$')
+        clasp deploy --versionNumber $VERSION --description "Production release - ${{ github.sha }}"
+        
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Release v${{ github.run_number }}
+        body: |
+          Production deployment of commit ${{ github.sha }}
+          
+          ## Changes
+          ${{ github.event.head_commit.message }}
+        draft: false
+        prerelease: false
