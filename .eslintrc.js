@@ -50,7 +50,7 @@ module.exports = {
     // Code quality rules
     'no-unused-vars': ['error', { 
       argsIgnorePattern: '^_',
-      varsIgnorePattern: '^_|^[A-Z].*Service$|^create|^add|^apply|^validate|^get|^generate|^convert|^batch|^set' 
+      varsIgnorePattern: '^_|^[A-Z].*Service$|^create|^add|^apply|^validate|^get|^generate|^convert|^batch|^set|^logger$' 
     }],
     'no-console': 'off', // console.log is valid in GAS
     'no-undef': 'error',
