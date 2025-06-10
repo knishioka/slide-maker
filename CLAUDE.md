@@ -10,6 +10,7 @@ Slidesコンテンツ自動生成サービス。ダブルカラム・シング�
 - **メイン技術**: Google Apps Script (JavaScript)
 - **API**: Google Slides API
 - **開発ツール**: clasp (Command Line Apps Script Projects)
+- **バージョン管理**: asdf (Runtime Version Manager)
 - **CI/CD**: GitHub Actions
 - **テスト**: GASUnit framework
 - **Lint**: ESLint + Prettier
@@ -175,7 +176,8 @@ function executeWithRetry(fn, maxRetries = 3) {
 1. **API制限監視**: Google APIs Consoleで使用量確認
 2. **テスト環境分離**: 開発・本番でGASプロジェクト分離
 3. **バージョン管理**: claspで適切にバージョン管理
-4. **ドキュメント更新**: 機能追加時は必ずdocs/更新
+4. **ランタイム管理**: asdfで Node.js バージョンを統一管理
+5. **ドキュメント更新**: 機能追加時は必ずdocs/更新
 
 ## トラブルシューティング
 
@@ -183,3 +185,4 @@ function executeWithRetry(fn, maxRetries = 3) {
 - **API制限エラー**: レート制限実装確認
 - **権限エラー**: appsscript.jsonのoauthScopesに必要権限追加
 - **デプロイエラー**: `clasp versions`でバージョン確認後`clasp deploy`
+- **Node.jsバージョンエラー**: `asdf install nodejs` でバージョンインストール後 `asdf local nodejs <version>`

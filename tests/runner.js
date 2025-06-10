@@ -24,6 +24,82 @@ class TestRunner {
   }
 
   /**
+   * Simple mock function implementation
+   */
+  mockFn(implementation) {
+    const mockData = {
+      calls: [],
+      results: [],
+      instances: [],
+      implementation: implementation || (() => {}),
+      onceValues: [],
+      returnValue: undefined,
+      hasReturnValue: false
+    };
+    
+    const mockFunction = function (...args) {
+      mockData.calls.push([...args]);
+      mockData.instances.push(this);
+      
+      try {
+        let result;
+        
+        // Check for one-time return values first
+        if (mockData.onceValues.length > 0) {
+          result = mockData.onceValues.shift();
+        } else if (mockData.hasReturnValue) {
+          result = mockData.returnValue;
+        } else {
+          result = mockData.implementation.apply(this, args);
+        }
+        
+        mockData.results.push({ type: 'return', value: result });
+        return result;
+      } catch (error) {
+        mockData.results.push({ type: 'throw', value: error });
+        throw error;
+      }
+    };
+    
+    // Attach mock properties
+    mockFunction.mock = mockData;
+    
+    mockFunction.mockReturnValue = (value) => {
+      mockData.returnValue = value;
+      mockData.hasReturnValue = true;
+      return mockFunction;
+    };
+    
+    mockFunction.mockImplementation = (impl) => {
+      mockData.implementation = impl;
+      mockData.hasReturnValue = false;
+      return mockFunction;
+    };
+    
+    mockFunction.mockReturnValueOnce = (value) => {
+      mockData.onceValues.push(value);
+      return mockFunction;
+    };
+    
+    mockFunction.mockClear = () => {
+      mockData.calls.length = 0;
+      mockData.results.length = 0;
+      mockData.instances.length = 0;
+      return mockFunction;
+    };
+    
+    mockFunction.mockReset = () => {
+      mockFunction.mockClear();
+      mockData.implementation = () => {};
+      mockData.hasReturnValue = false;
+      mockData.onceValues.length = 0;
+      return mockFunction;
+    };
+    
+    return mockFunction;
+  }
+
+  /**
    * Load test files based on type
    * @param {string} testType - unit, integration, or e2e
    * @returns {Array} Array of test file paths
@@ -51,58 +127,55 @@ class TestRunner {
   setupGASMocks() {
     global.console = console;
 
-    // Simple mock function without Jest dependency
-    const mockFn = (returnValue = undefined) => () => returnValue;
-
-    // Mock GAS Services
+    // Mock GAS Services using improved mock implementation
     global.SlidesApp = {
-      create: mockFn({ getId: () => 'mock-presentation-id' }),
-      openById: mockFn({
-        getSlides: () => [{ insertTextBox: mockFn() }]
-      })
+      create: this.mockFn(() => ({ getId: () => 'mock-presentation-id' })),
+      openById: this.mockFn(() => ({
+        getSlides: () => [{ insertTextBox: this.mockFn() }]
+      }))
     };
 
     global.DriveApp = {
-      createFile: mockFn({
+      createFile: this.mockFn(() => ({
         getId: () => 'mock-file-id',
         getBlob: () => ({ getBytes: () => new Uint8Array() })
-      }),
-      getFileById: mockFn({
-        setTrashed: mockFn()
-      })
+      })),
+      getFileById: this.mockFn(() => ({
+        setTrashed: this.mockFn()
+      }))
     };
 
     global.PropertiesService = {
       getScriptProperties: () => ({
-        getProperty: mockFn(),
-        setProperty: mockFn(),
-        getProperties: mockFn({})
+        getProperty: this.mockFn(),
+        setProperty: this.mockFn(),
+        getProperties: this.mockFn(() => ({}))
       })
     };
 
     global.Utilities = {
-      sleep: mockFn(),
-      base64Encode: str => Buffer.from(str).toString('base64'),
-      base64Decode: str => Buffer.from(str, 'base64').toString()
+      sleep: this.mockFn(),
+      base64Encode: this.mockFn(str => Buffer.from(str).toString('base64')),
+      base64Decode: this.mockFn(str => Buffer.from(str, 'base64').toString())
     };
 
     global.UrlFetchApp = {
-      fetch: mockFn({
+      fetch: this.mockFn(() => ({
         getContentText: () => '{"status": "success"}',
         getResponseCode: () => 200
-      })
+      }))
     };
 
     global.Logger = {
-      log: console.log
+      log: this.mockFn(console.log)
     };
 
     global.HtmlService = {
-      createHtmlOutputFromFile: mockFn({
-        setTitle: mockFn(),
-        setWidth: mockFn(),
-        setHeight: mockFn()
-      })
+      createHtmlOutputFromFile: this.mockFn(() => ({
+        setTitle: this.mockFn(),
+        setWidth: this.mockFn(),
+        setHeight: this.mockFn()
+      }))
     };
   }
 
@@ -110,6 +183,17 @@ class TestRunner {
    * Simple test framework implementation
    */
   setupTestFramework() {
+    // Setup jest global
+    global.jest = {
+      fn: (implementation) => this.mockFn(implementation),
+      clearAllMocks: () => {
+        // Simple implementation - in a real scenario, we'd track all mocks
+      },
+      restoreAllMocks: () => {
+        // Simple implementation
+      }
+    };
+
     global.describe = (suiteName, suiteFunc) => {
       this.currentSuite = suiteName;
       console.log(`\n📋 ${suiteName}`);
@@ -158,22 +242,237 @@ class TestRunner {
           throw new Error(`Expected falsy value, but got ${actual}`);
         }
       },
-      toThrow: () => {
+      toThrow: (expectedMessage) => {
         let thrown = false;
+        let thrownError = null;
         try {
           if (typeof actual === 'function') {
             actual();
           }
         } catch (e) {
           thrown = true;
+          thrownError = e;
         }
         if (!thrown) {
           throw new Error('Expected function to throw an error');
         }
+        if (expectedMessage && !thrownError.message.includes(expectedMessage)) {
+          throw new Error(`Expected error message to contain "${expectedMessage}", but got "${thrownError.message}"`);
+        }
+      },
+      toContain: (expected) => {
+        if (Array.isArray(actual)) {
+          if (!actual.includes(expected)) {
+            throw new Error(`Expected array to contain ${expected}, but it did not`);
+          }
+        } else if (typeof actual === 'string') {
+          if (!actual.includes(expected)) {
+            throw new Error(`Expected string to contain "${expected}", but it did not`);
+          }
+        } else {
+          throw new Error('toContain can only be used with arrays or strings');
+        }
+      },
+      toHaveLength: (expected) => {
+        if (!actual || typeof actual.length !== 'number') {
+          throw new Error('Expected value to have a length property');
+        }
+        if (actual.length !== expected) {
+          throw new Error(`Expected length ${expected}, but got ${actual.length}`);
+        }
+      },
+      toBeInstanceOf: (expected) => {
+        if (!(actual instanceof expected)) {
+          throw new Error(`Expected value to be instance of ${expected.name}`);
+        }
+      },
+      toHaveBeenCalled: () => {
+        if (!actual.mock || !Array.isArray(actual.mock.calls)) {
+          throw new Error('Expected a mock function');
+        }
+        if (actual.mock.calls.length === 0) {
+          throw new Error('Expected function to have been called');
+        }
+      },
+      toHaveBeenCalledWith: (...expectedArgs) => {
+        if (!actual.mock || !Array.isArray(actual.mock.calls)) {
+          throw new Error('Expected a mock function');
+        }
+        const found = actual.mock.calls.some(call => {
+          if (call.length !== expectedArgs.length) {
+            return false;
+          }
+          return call.every((arg, index) => {
+            const expected = expectedArgs[index];
+            // Handle expect matchers
+            if (expected && typeof expected === 'object') {
+              if (expected.expectedString) {
+                return typeof arg === 'string' && arg.includes(expected.expectedString);
+              }
+              if (expected.pattern) {
+                return typeof arg === 'string' && expected.pattern.test(arg);
+              }
+              if (expected.expectedObject) {
+                return typeof arg === 'object' && arg !== null &&
+                       Object.entries(expected.expectedObject).every(([key, value]) =>
+                         arg[key] !== undefined && JSON.stringify(arg[key]) === JSON.stringify(value));
+              }
+            }
+            return JSON.stringify(arg) === JSON.stringify(expected);
+          });
+        });
+        if (!found) {
+          throw new Error(`Expected function to have been called with ${JSON.stringify(expectedArgs)}`);
+        }
+      },
+      toHaveBeenCalledTimes: (expected) => {
+        if (!actual.mock || !Array.isArray(actual.mock.calls)) {
+          throw new Error('Expected a mock function');
+        }
+        if (actual.mock.calls.length !== expected) {
+          throw new Error(`Expected function to have been called ${expected} times, but it was called ${actual.mock.calls.length} times`);
+        }
+      },
+      not: {
+        toBe: (expected) => {
+          if (actual === expected) {
+            throw new Error(`Expected ${actual} not to be ${expected}`);
+          }
+        },
+        toEqual: (expected) => {
+          if (JSON.stringify(actual) === JSON.stringify(expected)) {
+            throw new Error(`Expected ${JSON.stringify(actual)} not to equal ${JSON.stringify(expected)}`);
+          }
+        },
+        toContain: (expected) => {
+          if (Array.isArray(actual) && actual.includes(expected)) {
+            throw new Error(`Expected array not to contain ${expected}`);
+          } else if (typeof actual === 'string' && actual.includes(expected)) {
+            throw new Error(`Expected string not to contain "${expected}"`);
+          }
+        },
+        toHaveBeenCalled: () => {
+          if (!actual.mock || !Array.isArray(actual.mock.calls)) {
+            throw new Error('Expected a mock function');
+          }
+          if (actual.mock.calls.length > 0) {
+            throw new Error('Expected function not to have been called');
+          }
+        },
+        toHaveBeenCalledWith: (...expectedArgs) => {
+          if (!actual.mock || !Array.isArray(actual.mock.calls)) {
+            throw new Error('Expected a mock function');
+          }
+          const found = actual.mock.calls.some(call => 
+            call.length === expectedArgs.length &&
+            call.every((arg, index) => JSON.stringify(arg) === JSON.stringify(expectedArgs[index])));
+          if (found) {
+            throw new Error(`Expected function not to have been called with ${JSON.stringify(expectedArgs)}`);
+          }
+        },
+        toThrow: () => {
+          let thrown = false;
+          try {
+            if (typeof actual === 'function') {
+              actual();
+            }
+          } catch (e) {
+            thrown = true;
+          }
+          if (thrown) {
+            throw new Error('Expected function not to throw');
+          }
+        }
+      },
+      // String matchers
+      stringContaining: (expected) => {
+        if (typeof actual !== 'string' || !actual.includes(expected)) {
+          throw new Error(`Expected string containing "${expected}"`);
+        }
+      },
+      stringMatching: (pattern) => {
+        if (typeof actual !== 'string' || !pattern.test(actual)) {
+          throw new Error(`Expected string matching pattern ${pattern}`);
+        }
+      },
+      // Object matchers
+      objectContaining: (expected) => {
+        if (typeof actual !== 'object' || actual === null) {
+          throw new Error('Expected an object');
+        }
+        for (const [key, value] of Object.entries(expected)) {
+          if (!(key in actual) || JSON.stringify(actual[key]) !== JSON.stringify(value)) {
+            throw new Error(`Expected object to contain property ${key} with value ${JSON.stringify(value)}`);
+          }
+        }
+      },
+      // Number matchers
+      toBeGreaterThan: (expected) => {
+        if (typeof actual !== 'number' || actual <= expected) {
+          throw new Error(`Expected ${actual} to be greater than ${expected}`);
+        }
+      },
+      toBeLessThan: (expected) => {
+        if (typeof actual !== 'number' || actual >= expected) {
+          throw new Error(`Expected ${actual} to be less than ${expected}`);
+        }
+      },
+      toBeCloseTo: (expected, precision = 2) => {
+        if (typeof actual !== 'number') {
+          throw new Error('Expected a number');
+        }
+        const pass = Math.abs(expected - actual) < Math.pow(10, -precision) / 2;
+        if (!pass) {
+          throw new Error(`Expected ${actual} to be close to ${expected}`);
+        }
+      },
+      // Additional matchers
+      toBeDefined: () => {
+        if (actual === undefined) {
+          throw new Error('Expected value to be defined');
+        }
+      },
+      toBeUndefined: () => {
+        if (actual !== undefined) {
+          throw new Error('Expected value to be undefined');
+        }
+      },
+      toBeNull: () => {
+        if (actual !== null) {
+          throw new Error('Expected value to be null');
+        }
+      },
+      toMatch: (pattern) => {
+        if (typeof actual !== 'string') {
+          throw new Error('toMatch requires a string');
+        }
+        const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
+        if (!regex.test(actual)) {
+          throw new Error(`Expected "${actual}" to match ${pattern}`);
+        }
       }
     });
 
-    global.beforeEach = func => {
+    // Add expect helpers
+    global.expect.anything = () => ({ toString: () => 'anything()' });
+    global.expect.any = (constructor) => ({ 
+      toString: () => `any(${constructor.name})`,
+      constructor 
+    });
+    global.expect.stringContaining = (str) => ({ 
+      toString: () => `stringContaining("${str}")`,
+      expectedString: str 
+    });
+    global.expect.stringMatching = (pattern) => ({ 
+      toString: () => `stringMatching(${pattern})`,
+      pattern 
+    });
+    global.expect.objectContaining = (obj) => ({ 
+      toString: () => `objectContaining(${JSON.stringify(obj)})`,
+      expectedObject: obj 
+    });
+
+    global.beforeEach = (func) => {
       // Simple implementation - just run before each test
       func();
     };

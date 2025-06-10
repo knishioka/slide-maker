@@ -29,7 +29,8 @@ module.exports = {
     beforeEach: 'readonly',
     afterEach: 'readonly',
     jest: 'readonly',
-
+    global: 'readonly',
+    
     // Custom globals for this project
     SlidesService: 'readonly',
     ContentService: 'readonly',
