@@ -2,8 +2,10 @@
  * Comprehensive Logging System for Google Apps Script
  * Supports multiple log levels, sheet logging, and structured error tracking
  */
-
 class Logger {
+  /**
+   * Initialize Logger with default configuration
+   */
   constructor() {
     this.LOG_LEVELS = {
       DEBUG: 3,

@@ -2,8 +2,10 @@
  * Google Slides API Wrapper Service
  * Provides comprehensive Google Slides operations with error handling and retry logic
  */
-
 class SlidesService {
+  /**
+   * Initialize SlidesService with retry configuration
+   */
   constructor() {
     this.maxRetries = 3;
     this.baseDelay = 1000;

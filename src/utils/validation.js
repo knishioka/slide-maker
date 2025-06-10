@@ -2,8 +2,10 @@
  * Input Validation and Sanitization Utilities
  * Provides comprehensive validation for Google Slides content generation
  */
-
 class ValidationService {
+  /**
+   * Initialize ValidationService with validation constraints and rules
+   */
   constructor() {
     this.SLIDE_CONSTRAINTS = {
       MIN_WIDTH: 320,

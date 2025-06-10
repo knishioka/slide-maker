@@ -2,8 +2,10 @@
  * Content Management Service
  * Orchestrates slide content creation, layout management, and theme application
  */
-
 class ContentService {
+  /**
+   * Initialize ContentService with required dependencies
+   */
   constructor() {
     this.slidesService = new SlidesService();
     this.validationService = new ValidationService();
@@ -114,12 +116,17 @@ class ContentService {
       const contentElements = [];
 
       if (slideData.title) {
-        const titleElement = await this.addTitleElement(presentationId, slideIndex, slideData.title, slideDimensions, activeTheme);
+        const titleElement = await this.addTitleElement(
+          presentationId, slideIndex, slideData.title, slideDimensions, activeTheme
+        );
         contentElements.push(titleElement);
       }
 
       if (slideData.content) {
-        const contentResult = await this.addContentElements(presentationId, slideIndex, slideData.content, slideDimensions, activeTheme, slideData.layout);
+        const contentResult = await this.addContentElements(
+          presentationId, slideIndex, slideData.content, 
+          slideDimensions, activeTheme, slideData.layout
+        );
         contentElements.push(...contentResult);
       }
 
@@ -167,7 +174,9 @@ class ContentService {
       alignment: 'CENTER'
     };
 
-    const textBox = this.slidesService.insertTextBox(presentationId, slideIndex, title, position, style);
+    const textBox = this.slidesService.insertTextBox(
+      presentationId, slideIndex, title, position, style
+    );
 
     return {
       type: 'title',
@@ -198,23 +207,33 @@ class ContentService {
         
         switch (item.type) {
           case 'text':
-            element = await this.addTextElement(presentationId, slideIndex, item, slideDimensions, theme, layout, i);
+            element = await this.addTextElement(
+              presentationId, slideIndex, item, slideDimensions, theme, layout, i
+            );
             break;
             
           case 'image':
-            element = await this.addImageElement(presentationId, slideIndex, item, slideDimensions, layout, i);
+            element = await this.addImageElement(
+              presentationId, slideIndex, item, slideDimensions, layout, i
+            );
             break;
             
           case 'table':
-            element = await this.addTableElement(presentationId, slideIndex, item, slideDimensions, theme, layout, i);
+            element = await this.addTableElement(
+              presentationId, slideIndex, item, slideDimensions, theme, layout, i
+            );
             break;
             
           case 'mermaid':
-            element = await this.addMermaidElement(presentationId, slideIndex, item, slideDimensions, layout, i);
+            element = await this.addMermaidElement(
+              presentationId, slideIndex, item, slideDimensions, layout, i
+            );
             break;
             
           case 'svg':
-            element = await this.addSVGElement(presentationId, slideIndex, item, slideDimensions, layout, i);
+            element = await this.addSVGElement(
+              presentationId, slideIndex, item, slideDimensions, layout, i
+            );
             break;
             
           default:
@@ -272,7 +291,9 @@ class ContentService {
       alignment: textItem.alignment || 'LEFT'
     };
 
-    const textBox = this.slidesService.insertTextBox(presentationId, slideIndex, validation.sanitized.text, position, style);
+    const textBox = this.slidesService.insertTextBox(
+      presentationId, slideIndex, validation.sanitized.text, position, style
+    );
 
     return {
       type: 'text',
@@ -301,7 +322,9 @@ class ContentService {
     const position = imageItem.position || 
       this.calculateContentPosition(slideDimensions, layout, elementIndex, 'image');
 
-    const image = this.slidesService.insertImage(presentationId, slideIndex, validation.sanitized.source, position);
+    const image = this.slidesService.insertImage(
+      presentationId, slideIndex, validation.sanitized.source, position
+    );
 
     return {
       type: 'image',
@@ -334,7 +357,9 @@ class ContentService {
     const rows = validation.sanitized.length;
     const columns = Math.max(...validation.sanitized.map(row => row.length));
 
-    const table = this.slidesService.insertTable(presentationId, slideIndex, rows, columns, position, validation.sanitized);
+    const table = this.slidesService.insertTable(
+      presentationId, slideIndex, rows, columns, position, validation.sanitized
+    );
 
     return {
       type: 'table',
@@ -393,7 +418,9 @@ class ContentService {
     const position = svgItem.position || 
       this.calculateContentPosition(slideDimensions, layout, elementIndex, 'diagram');
 
-    const image = this.slidesService.insertSVG(presentationId, slideIndex, validation.sanitized, position);
+    const image = this.slidesService.insertSVG(
+      presentationId, slideIndex, validation.sanitized, position
+    );
 
     return {
       type: 'svg',
