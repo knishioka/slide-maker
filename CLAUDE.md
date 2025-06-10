@@ -39,12 +39,19 @@ Google Apps ScriptベースのGoogle Slidesコンテンツ自動生成サービ�
 
 ## Claude Code 開発ベストプラクティス
 
-### 1. 開発フロー
-1. **調査フェーズ**: まずTaskツールで関連ファイル・機能を調査
-2. **計画**: TodoWriteツールで作業を細分化・管理
-3. **実装**: 既存コードパターンに従って開発
-4. **テスト**: 実装後即座にテスト実行
-5. **Lint**: コミット前に必ずlint実行
+### 1. 開発フロー（Git Worktree活用）
+1. **機能別worktree作成**: 新機能開発時は必ずgit worktreeで分離
+   ```bash
+   # 新機能開発用worktree作成
+   git worktree add -b feature-name ../feature-name
+   cd ../feature-name
+   ```
+2. **調査フェーズ**: まずTaskツールで関連ファイル・機能を調査
+3. **計画**: TodoWriteツールで作業を細分化・管理
+4. **実装**: 既存コードパターンに従って開発
+5. **テスト**: 実装後即座にテスト実行
+6. **Lint**: コミット前に必ずlint実行
+7. **マージ**: 完了後mainブランチにマージしworktree削除
 
 ### 2. ファイル操作の制約
 - **既存ファイル優先**: 新規ファイル作成は最小限に
@@ -153,12 +160,37 @@ function executeWithRetry(fn, maxRetries = 3) {
 }
 ```
 
+## Git Worktree 分散開発戦略
+### 基本原則
+- **機能単位の分離**: 新機能・修正は必ず専用worktreeで開発
+- **並行開発対応**: 複数機能を同時に開発可能
+- **クリーンな環境**: 各worktreeは独立した作業環境
+
+### Worktree管理コマンド
+```bash
+# 利用可能なスクリプト
+./scripts/setup-worktrees.sh      # 初回セットアップ
+./scripts/manage-worktrees.sh     # worktree管理
+
+# 手動操作
+git worktree list                 # worktree一覧
+git worktree add -b feat-x ../feat-x  # 新規作成
+git worktree remove ../feat-x     # 削除
+```
+
+### 開発ワークフロー
+1. **開始**: `git worktree add -b feature-name ../feature-name`
+2. **開発**: worktree内で通常の開発作業
+3. **テスト**: 各worktreeで独立してテスト実行
+4. **完了**: mainにマージ後 `git worktree remove`
+
 ## 開発時注意事項
 1. **API制限監視**: Google APIs Consoleで使用量確認
 2. **テスト環境分離**: 開発・本番でGASプロジェクト分離
 3. **バージョン管理**: claspで適切にバージョン管理
 4. **ランタイム管理**: asdfで Node.js バージョンを統一管理
 5. **ドキュメント更新**: 機能追加時は必ずdocs/更新
+6. **Worktree管理**: 機能完了後は必ずworktreeを削除してクリーンアップ
 
 ## トラブルシューティング
 - **clasp認証エラー**: `clasp login --creds credentials.json`
