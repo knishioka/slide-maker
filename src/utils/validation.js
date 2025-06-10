@@ -38,7 +38,37 @@ class ValidationService {
       'stateDiagram',
       'erDiagram',
       'gantt',
-      'pie'
+      'pie',
+      'journey',
+      'gitgraph',
+      'mindmap',
+      'timeline'
+    ];
+
+    this.SECURITY_PATTERNS = [
+      /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
+      /javascript:/gi,
+      /on\w+\s*=/gi,
+      /eval\s*\(/gi,
+      /document\./gi,
+      /window\./gi,
+      /location\./gi,
+      /fetch\s*\(/gi,
+      /xmlhttprequest/gi,
+      /iframe/gi
+    ];
+
+    this.MALICIOUS_KEYWORDS = [
+      'alert',
+      'confirm',
+      'prompt',
+      'document.cookie',
+      'localStorage',
+      'sessionStorage',
+      'innerHTML',
+      'outerHTML',
+      'importScripts',
+      'postMessage'
     ];
   }
 
@@ -354,16 +384,97 @@ class ValidationService {
    * @returns {boolean} True if suspicious content found
    */
   containsSuspiciousContent(content) {
-    const suspiciousPatterns = [
-      /<script/i,
-      /javascript:/i,
-      /on\w+\s*=/i,
-      /eval\s*\(/i,
-      /document\./i,
-      /window\./i
-    ];
+    if (!content || typeof content !== 'string') {
+      return false;
+    }
 
-    return suspiciousPatterns.some(pattern => pattern.test(content));
+    const normalizedContent = content.toLowerCase();
+
+    for (const pattern of this.SECURITY_PATTERNS) {
+      if (pattern.test(content)) {
+        return true;
+      }
+    }
+
+    for (const keyword of this.MALICIOUS_KEYWORDS) {
+      if (normalizedContent.includes(keyword.toLowerCase())) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Perform deep security validation on content
+   * @param {string} content - Content to validate
+   * @param {string} contentType - Type of content (svg, mermaid, text)
+   * @returns {Object} Security validation result
+   */
+  performSecurityValidation(content, contentType = 'text') {
+    const issues = [];
+    const warnings = [];
+
+    if (this.containsSuspiciousContent(content)) {
+      issues.push(`Potentially malicious content detected in ${contentType}`);
+    }
+
+    if (content.length > 100000) {
+      warnings.push(`${contentType} content is very large and may impact performance`);
+    }
+
+    const urlPattern = /https?:\/\/[^\s<>"]+/gi;
+    const urls = content.match(urlPattern) || [];
+    
+    for (const url of urls) {
+      if (!this.isValidUrl(url)) {
+        warnings.push(`Invalid URL detected: ${url}`);
+      } else if (!url.startsWith('https://')) {
+        warnings.push(`Non-HTTPS URL detected: ${url}`);
+      }
+    }
+
+    if (contentType === 'svg') {
+      const dangerousSvgElements = ['foreignObject', 'use', 'script', 'animation'];
+      for (const element of dangerousSvgElements) {
+        if (content.toLowerCase().includes(`<${element}`)) {
+          issues.push(`Potentially dangerous SVG element: ${element}`);
+        }
+      }
+    }
+
+    return {
+      isSecure: issues.length === 0,
+      issues,
+      warnings,
+      threatLevel: this.calculateThreatLevel(issues, warnings)
+    };
+  }
+
+  /**
+   * Calculate threat level based on security issues
+   * @param {Array} issues - Security issues
+   * @param {Array} warnings - Security warnings
+   * @returns {string} Threat level (low, medium, high, critical)
+   */
+  calculateThreatLevel(issues, warnings) {
+    if (issues.length === 0 && warnings.length === 0) {
+      return 'none';
+    }
+
+    if (issues.length === 0) {
+      return warnings.length > 2 ? 'low' : 'minimal';
+    }
+
+    if (issues.some(issue => issue.includes('script') || issue.includes('malicious'))) {
+      return 'critical';
+    }
+
+    if (issues.length > 2) {
+      return 'high';
+    }
+
+    return 'medium';
   }
 
   /**
@@ -376,7 +487,10 @@ class ValidationService {
       return '';
     }
 
-    return text
+    let sanitized = text
+      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+      .replace(/javascript:/gi, '')
+      .replace(/on\w+\s*=/gi, '')
       .replace(/<[^>]*>/g, '')
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
@@ -384,6 +498,13 @@ class ValidationService {
       .replace(/&quot;/g, '"')
       .replace(/&#x27;/g, "'")
       .trim();
+
+    for (const keyword of this.MALICIOUS_KEYWORDS) {
+      const regex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      sanitized = sanitized.replace(regex, '[FILTERED]');
+    }
+
+    return sanitized;
   }
 
   /**
@@ -491,6 +612,171 @@ class ValidationService {
       sanitized,
       itemResults: results
     };
+  }
+
+  /**
+   * Validate content structure for accessibility
+   * @param {Object} content - Content to validate
+   * @returns {Object} Accessibility validation result
+   */
+  validateAccessibility(content) {
+    const issues = [];
+    const suggestions = [];
+
+    if (content.type === 'image' && !content.altText) {
+      issues.push('Image missing alternative text for screen readers');
+    }
+
+    if (content.type === 'text' && content.fontSize && content.fontSize < 14) {
+      suggestions.push('Consider using larger font size for better readability (minimum 14pt)');
+    }
+
+    if (content.color && content.backgroundColor) {
+      const contrastRatio = this.calculateContrastRatio(content.color, content.backgroundColor);
+      if (contrastRatio < 4.5) {
+        issues.push('Text color and background color have insufficient contrast for accessibility');
+      }
+    }
+
+    if (content.type === 'table' && content.data) {
+      const hasHeaders = content.data.length > 0 && 
+        content.data[0].every(cell => typeof cell === 'string' && cell.trim().length > 0);
+      
+      if (!hasHeaders) {
+        suggestions.push('Consider adding header row to table for better accessibility');
+      }
+    }
+
+    return {
+      isAccessible: issues.length === 0,
+      issues,
+      suggestions,
+      score: this.calculateAccessibilityScore(issues, suggestions)
+    };
+  }
+
+  /**
+   * Calculate contrast ratio between two colors
+   * @param {string} color1 - First color (hex)
+   * @param {string} color2 - Second color (hex)
+   * @returns {number} Contrast ratio
+   */
+  calculateContrastRatio(color1, color2) {
+    const getLuminance = (hexColor) => {
+      const rgb = this.hexToRgb(hexColor);
+      if (!rgb) return 0;
+
+      const sRGB = [rgb.r, rgb.g, rgb.b].map(c => {
+        c = c / 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      });
+
+      return 0.2126 * sRGB[0] + 0.7152 * sRGB[1] + 0.0722 * sRGB[2];
+    };
+
+    const lum1 = getLuminance(color1);
+    const lum2 = getLuminance(color2);
+    
+    const brightest = Math.max(lum1, lum2);
+    const darkest = Math.min(lum1, lum2);
+    
+    return (brightest + 0.05) / (darkest + 0.05);
+  }
+
+  /**
+   * Convert hex color to RGB
+   * @param {string} hex - Hex color string
+   * @returns {Object|null} RGB object or null
+   */
+  hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : null;
+  }
+
+  /**
+   * Calculate accessibility score
+   * @param {Array} issues - Accessibility issues
+   * @param {Array} suggestions - Accessibility suggestions
+   * @returns {number} Score from 0-100
+   */
+  calculateAccessibilityScore(issues, suggestions) {
+    const baseScore = 100;
+    const issueDeduction = issues.length * 20;
+    const suggestionDeduction = suggestions.length * 5;
+    
+    return Math.max(0, baseScore - issueDeduction - suggestionDeduction);
+  }
+
+  /**
+   * Validate content performance impact
+   * @param {Object} content - Content to validate
+   * @returns {Object} Performance validation result
+   */
+  validatePerformance(content) {
+    const issues = [];
+    const recommendations = [];
+
+    if (content.type === 'image') {
+      if (content.source && typeof content.source === 'string' && content.source.startsWith('http')) {
+        recommendations.push('Consider using optimized images to improve loading performance');
+      }
+    }
+
+    if (content.type === 'mermaid' && content.code) {
+      const complexity = this.assessMermaidComplexity(content.code);
+      if (complexity > 50) {
+        issues.push('Mermaid diagram is very complex and may impact rendering performance');
+      } else if (complexity > 25) {
+        recommendations.push('Consider simplifying Mermaid diagram for better performance');
+      }
+    }
+
+    if (content.type === 'table' && content.data) {
+      const cellCount = content.data.reduce((total, row) => total + row.length, 0);
+      if (cellCount > 200) {
+        issues.push('Table has too many cells and may impact slide performance');
+      } else if (cellCount > 100) {
+        recommendations.push('Consider breaking large table into smaller sections');
+      }
+    }
+
+    return {
+      isOptimal: issues.length === 0,
+      issues,
+      recommendations,
+      performanceScore: this.calculatePerformanceScore(issues, recommendations)
+    };
+  }
+
+  /**
+   * Assess Mermaid diagram complexity
+   * @param {string} mermaidCode - Mermaid code
+   * @returns {number} Complexity score
+   */
+  assessMermaidComplexity(mermaidCode) {
+    const lines = mermaidCode.split('\n').length;
+    const nodes = (mermaidCode.match(/\w+\[/g) || []).length;
+    const connections = (mermaidCode.match(/-->/g) || []).length;
+    
+    return lines + nodes * 2 + connections;
+  }
+
+  /**
+   * Calculate performance score
+   * @param {Array} issues - Performance issues
+   * @param {Array} recommendations - Performance recommendations
+   * @returns {number} Score from 0-100
+   */
+  calculatePerformanceScore(issues, recommendations) {
+    const baseScore = 100;
+    const issueDeduction = issues.length * 25;
+    const recommendationDeduction = recommendations.length * 5;
+    
+    return Math.max(0, baseScore - issueDeduction - recommendationDeduction);
   }
 }
 

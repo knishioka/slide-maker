@@ -21,11 +21,13 @@ class Logger {
 
   /**
    * Set logging level
-   * @param {string} level - LOG level (DEBUG, INFO, WARN, ERROR)
+   * @param {string|number} level - LOG level (DEBUG, INFO, WARN, ERROR) or numeric value
    */
   setLevel(level) {
-    if (Object.prototype.hasOwnProperty.call(this.LOG_LEVELS, level)) {
-      this.currentLevel = this.LOG_LEVELS[level];
+    if (typeof level === 'string' && Object.prototype.hasOwnProperty.call(this.LOG_LEVELS, level.toUpperCase())) {
+      this.currentLevel = this.LOG_LEVELS[level.toUpperCase()];
+    } else if (typeof level === 'number' && level >= 0 && level <= 3) {
+      this.currentLevel = level;
     }
   }
 
@@ -307,6 +309,165 @@ class Logger {
     } catch (error) {
       return 0;
     }
+  }
+
+  /**
+   * Get execution quota information
+   * @returns {Object} Quota information
+   */
+  getQuotaInfo() {
+    try {
+      const trigger = ScriptApp.newTrigger('dummyFunction')
+        .timeBased()
+        .after(1)
+        .create();
+      
+      ScriptApp.deleteTrigger(trigger);
+      
+      return {
+        available: true,
+        executionTime: Date.now(),
+        timeZone: Session.getScriptTimeZone(),
+        userEmail: Session.getActiveUser().getEmail()
+      };
+    } catch (error) {
+      return {
+        available: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Create contextual logger for specific operations
+   * @param {string} context - Operation context
+   * @param {Object} metadata - Additional metadata
+   * @returns {Object} Contextual logger
+   */
+  createContextLogger(context, metadata = {}) {
+    const contextId = Utilities.getUuid();
+    
+    return {
+      context,
+      contextId,
+      metadata,
+      
+      debug: (message, data = null) => {
+        this.debug(`[${context}] ${message}`, { ...metadata, ...data, contextId });
+      },
+      
+      info: (message, data = null) => {
+        this.info(`[${context}] ${message}`, { ...metadata, ...data, contextId });
+      },
+      
+      warn: (message, data = null) => {
+        this.warn(`[${context}] ${message}`, { ...metadata, ...data, contextId });
+      },
+      
+      error: (message, data = null, error = null) => {
+        this.error(`[${context}] ${message}`, { ...metadata, ...data, contextId }, error);
+      },
+      
+      time: (operation, fn) => {
+        return this.time(`[${context}] ${operation}`, fn);
+      }
+    };
+  }
+
+  /**
+   * Log API usage for quota monitoring
+   * @param {string} apiName - API name
+   * @param {string} operation - Operation type
+   * @param {Object} metrics - Usage metrics
+   */
+  logApiUsage(apiName, operation, metrics = {}) {
+    const apiLogData = {
+      api: apiName,
+      operation,
+      timestamp: new Date().toISOString(),
+      quotaUsed: metrics.quotaUsed || 1,
+      responseTime: metrics.responseTime || 0,
+      success: metrics.success !== false
+    };
+
+    this.info('API Usage', apiLogData);
+
+    try {
+      const properties = PropertiesService.getScriptProperties();
+      const dailyKey = `api_usage_${apiName}_${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd')}`;
+      
+      const currentUsage = parseInt(properties.getProperty(dailyKey) || '0');
+      properties.setProperty(dailyKey, String(currentUsage + (metrics.quotaUsed || 1)));
+    } catch (error) {
+      this.warn('Failed to track API usage', { apiName, operation }, error);
+    }
+  }
+
+  /**
+   * Get daily API usage statistics
+   * @param {string} apiName - API name
+   * @param {Date} date - Target date (defaults to today)
+   * @returns {number} Daily usage count
+   */
+  getDailyApiUsage(apiName, date = new Date()) {
+    try {
+      const properties = PropertiesService.getScriptProperties();
+      const dailyKey = `api_usage_${apiName}_${Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd')}`;
+      
+      return parseInt(properties.getProperty(dailyKey) || '0');
+    } catch (error) {
+      this.warn('Failed to get API usage stats', { apiName, date }, error);
+      return 0;
+    }
+  }
+
+  /**
+   * Create structured error report
+   * @param {Error} error - Error object
+   * @param {Object} context - Error context
+   * @returns {Object} Structured error report
+   */
+  createErrorReport(error, context = {}) {
+    const errorReport = {
+      id: Utilities.getUuid(),
+      timestamp: new Date().toISOString(),
+      error: this.formatError(error),
+      context: this.sanitizeData(context),
+      stack: error.stack,
+      userAgent: context.userAgent || 'Google Apps Script',
+      executionInfo: this.getQuotaInfo(),
+      severity: this.classifyErrorSeverity(error)
+    };
+
+    this.error('Structured Error Report', errorReport, error);
+    return errorReport;
+  }
+
+  /**
+   * Classify error severity
+   * @param {Error} error - Error object
+   * @returns {string} Severity level
+   */
+  classifyErrorSeverity(error) {
+    const errorMessage = error.message.toLowerCase();
+    
+    if (errorMessage.includes('quota') || errorMessage.includes('limit')) {
+      return 'high';
+    }
+    
+    if (errorMessage.includes('permission') || errorMessage.includes('unauthorized')) {
+      return 'high';
+    }
+    
+    if (errorMessage.includes('timeout') || errorMessage.includes('network')) {
+      return 'medium';
+    }
+    
+    if (errorMessage.includes('validation') || errorMessage.includes('parameter')) {
+      return 'low';
+    }
+    
+    return 'medium';
   }
 
   /**

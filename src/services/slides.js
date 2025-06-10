@@ -22,12 +22,67 @@ class SlidesService {
       try {
         return fn();
       } catch (error) {
+        logger.warn(`Retry attempt ${i + 1}/${maxRetries}`, { error: error.message });
+        
         if (i === maxRetries - 1) {
+          logger.error('All retry attempts failed', null, error);
           throw error;
         }
+        
         const delay = this.baseDelay * Math.pow(2, i);
         Utilities.sleep(delay);
       }
+    }
+  }
+
+  /**
+   * Batch execute multiple operations with performance monitoring
+   * @param {Array<Function>} operations - Array of operations to execute
+   * @param {Object} options - Execution options
+   * @returns {Array} Results array
+   */
+  batchExecute(operations, options = {}) {
+    const {
+      batchSize = 10,
+      delayBetweenBatches = 100,
+      continueOnError = false
+    } = options;
+
+    const monitor = logger.createPerformanceMonitor('batchExecute');
+    monitor.start();
+
+    const results = [];
+    const errors = [];
+
+    try {
+      for (let i = 0; i < operations.length; i += batchSize) {
+        const batch = operations.slice(i, i + batchSize);
+        logger.debug(`Processing batch ${Math.floor(i / batchSize) + 1}`, {
+          batchSize: batch.length,
+          totalOperations: operations.length
+        });
+
+        for (const operation of batch) {
+          try {
+            const result = this.executeWithRetry(operation);
+            results.push(result);
+          } catch (error) {
+            errors.push({ index: results.length + errors.length, error });
+            if (!continueOnError) {
+              throw error;
+            }
+            results.push(null);
+          }
+        }
+
+        if (i + batchSize < operations.length && delayBetweenBatches > 0) {
+          Utilities.sleep(delayBetweenBatches);
+        }
+      }
+
+      return { results, errors, successful: results.filter(r => r !== null).length };
+    } finally {
+      monitor.end();
     }
   }
 
@@ -342,6 +397,172 @@ class SlidesService {
         width: presentation.getPageWidth(),
         height: presentation.getPageHeight()
       };
+    });
+  }
+
+  /**
+   * Clone slide within presentation
+   * @param {string} presentationId - Presentation ID
+   * @param {number} sourceSlideIndex - Source slide index
+   * @param {number} targetIndex - Target position index
+   * @returns {GoogleAppsScript.Slides.Slide} Cloned slide
+   */
+  cloneSlide(presentationId, sourceSlideIndex, targetIndex = null) {
+    return this.executeWithRetry(() => {
+      const presentation = this.openPresentation(presentationId);
+      const slides = presentation.getSlides();
+      
+      if (sourceSlideIndex < 0 || sourceSlideIndex >= slides.length) {
+        throw new Error('Source slide index out of bounds');
+      }
+
+      const sourceSlide = slides[sourceSlideIndex];
+      const clonedSlide = presentation.appendSlide(sourceSlide.getLayout());
+
+      const sourceShapes = sourceSlide.getShapes();
+      sourceShapes.forEach(shape => {
+        try {
+          this.cloneShape(shape, clonedSlide);
+        } catch (error) {
+          logger.warn('Failed to clone shape', { shapeType: shape.getShapeType() }, error);
+        }
+      });
+
+      if (targetIndex !== null && targetIndex !== slides.length) {
+        this.moveSlide(presentationId, slides.length, targetIndex);
+      }
+
+      return clonedSlide;
+    });
+  }
+
+  /**
+   * Clone shape to target slide
+   * @param {GoogleAppsScript.Slides.Shape} sourceShape - Source shape
+   * @param {GoogleAppsScript.Slides.Slide} targetSlide - Target slide
+   * @returns {GoogleAppsScript.Slides.Shape} Cloned shape
+   */
+  cloneShape(sourceShape, targetSlide) {
+    const shapeType = sourceShape.getShapeType();
+    
+    if (shapeType === SlidesApp.ShapeType.TEXT_BOX) {
+      const textContent = sourceShape.getText().asString();
+      const transform = sourceShape.getTransform();
+      
+      const clonedShape = targetSlide.insertTextBox(
+        textContent,
+        transform.getTranslateX(),
+        transform.getTranslateY(),
+        sourceShape.getWidth(),
+        sourceShape.getHeight()
+      );
+
+      this.copyTextStyle(sourceShape.getText(), clonedShape.getText());
+      return clonedShape;
+    }
+
+    if (shapeType === SlidesApp.ShapeType.IMAGE) {
+      const transform = sourceShape.getTransform();
+      const imageBlob = sourceShape.getAs('image/png');
+      
+      return targetSlide.insertImage(
+        imageBlob,
+        transform.getTranslateX(),
+        transform.getTranslateY(),
+        sourceShape.getWidth(),
+        sourceShape.getHeight()
+      );
+    }
+
+    logger.warn('Unsupported shape type for cloning', { shapeType });
+    return null;
+  }
+
+  /**
+   * Copy text style from source to target
+   * @param {GoogleAppsScript.Slides.TextRange} sourceText - Source text
+   * @param {GoogleAppsScript.Slides.TextRange} targetText - Target text
+   */
+  copyTextStyle(sourceText, targetText) {
+    try {
+      const sourceStyle = sourceText.getTextStyle();
+      const targetStyle = targetText.getTextStyle();
+
+      targetStyle.setFontFamily(sourceStyle.getFontFamily());
+      targetStyle.setFontSize(sourceStyle.getFontSize());
+      targetStyle.setForegroundColor(sourceStyle.getForegroundColor().asRgbColor().asHexString());
+      targetStyle.setBold(sourceStyle.isBold());
+      targetStyle.setItalic(sourceStyle.isItalic());
+
+      const sourceParagraphStyle = sourceText.getParagraphStyle();
+      const targetParagraphStyle = targetText.getParagraphStyle();
+      
+      targetParagraphStyle.setParagraphAlignment(sourceParagraphStyle.getParagraphAlignment());
+      targetParagraphStyle.setLineSpacing(sourceParagraphStyle.getLineSpacing());
+    } catch (error) {
+      logger.warn('Failed to copy text style', null, error);
+    }
+  }
+
+  /**
+   * Move slide to new position
+   * @param {string} presentationId - Presentation ID
+   * @param {number} fromIndex - Source position
+   * @param {number} toIndex - Target position
+   * @returns {void}
+   */
+  moveSlide(presentationId, fromIndex, toIndex) {
+    return this.executeWithRetry(() => {
+      const presentation = this.openPresentation(presentationId);
+      const slides = presentation.getSlides();
+      
+      if (fromIndex < 0 || fromIndex >= slides.length || toIndex < 0 || toIndex >= slides.length) {
+        throw new Error('Slide index out of bounds');
+      }
+
+      if (fromIndex === toIndex) {
+        return;
+      }
+
+      const slideToMove = slides[fromIndex];
+      
+      if (fromIndex < toIndex) {
+        for (let i = fromIndex; i < toIndex; i++) {
+          slides[i + 1].move(i);
+        }
+      } else {
+        for (let i = fromIndex; i > toIndex; i--) {
+          slides[i - 1].move(i);
+        }
+      }
+      
+      slideToMove.move(toIndex);
+    });
+  }
+
+  /**
+   * Export presentation to different formats
+   * @param {string} presentationId - Presentation ID
+   * @param {string} format - Export format (PDF, PPTX, JPEG, PNG)
+   * @returns {Blob} Exported content blob
+   */
+  exportPresentation(presentationId, format = 'PDF') {
+    return this.executeWithRetry(() => {
+      const presentation = this.openPresentation(presentationId);
+      
+      const formatMap = {
+        'PDF': 'application/pdf',
+        'PPTX': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'JPEG': 'image/jpeg',
+        'PNG': 'image/png'
+      };
+
+      const mimeType = formatMap[format.toUpperCase()];
+      if (!mimeType) {
+        throw new Error(`Unsupported export format: ${format}`);
+      }
+
+      return presentation.getAs(mimeType);
     });
   }
 }
