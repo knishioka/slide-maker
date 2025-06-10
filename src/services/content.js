@@ -9,7 +9,7 @@ class ContentService {
   constructor() {
     this.slidesService = new SlidesService();
     this.validationService = new ValidationService();
-    
+
     this.defaultTheme = {
       fontFamily: 'Arial',
       titleFontSize: 36,
@@ -70,18 +70,21 @@ class ContentService {
       if (presentationData.slides && presentationData.slides.length > 0) {
         for (let i = 0; i < presentationData.slides.length; i++) {
           const slideData = presentationData.slides[i];
-          const slideResult = await this.addSlideWithContent(presentationId, slideData, result.theme);
+          const slideResult = await this.addSlideWithContent(
+            presentationId,
+            slideData,
+            result.theme
+          );
           result.slides.push(slideResult);
         }
       }
 
-      logger.info('Presentation creation completed', { 
-        presentationId, 
-        slideCount: result.slides.length 
+      logger.info('Presentation creation completed', {
+        presentationId,
+        slideCount: result.slides.length
       });
 
       return result;
-
     } catch (error) {
       logger.error('Presentation creation failed', { presentationData }, error);
       throw error;
@@ -99,7 +102,7 @@ class ContentService {
    */
   async addSlideWithContent(presentationId, slideData, theme = null) {
     const activeTheme = theme || this.defaultTheme;
-    
+
     try {
       logger.debug('Adding slide with content', { presentationId, slideType: slideData.type });
 
@@ -110,30 +113,38 @@ class ContentService {
 
       const slide = this.slidesService.addSlide(presentationId, 'BLANK');
       const slideIndex = await this.getSlideIndex(presentationId, slide);
-      
+
       const slideDimensions = this.slidesService.getSlideDimensions(presentationId);
-      
+
       const contentElements = [];
 
       if (slideData.title) {
         const titleElement = await this.addTitleElement(
-          presentationId, slideIndex, slideData.title, slideDimensions, activeTheme
+          presentationId,
+          slideIndex,
+          slideData.title,
+          slideDimensions,
+          activeTheme
         );
         contentElements.push(titleElement);
       }
 
       if (slideData.content) {
         const contentResult = await this.addContentElements(
-          presentationId, slideIndex, slideData.content, 
-          slideDimensions, activeTheme, slideData.layout
+          presentationId,
+          slideIndex,
+          slideData.content,
+          slideDimensions,
+          activeTheme,
+          slideData.layout
         );
         contentElements.push(...contentResult);
       }
 
-      logger.info('Slide added successfully', { 
-        presentationId, 
-        slideIndex, 
-        elementCount: contentElements.length 
+      logger.info('Slide added successfully', {
+        presentationId,
+        slideIndex,
+        elementCount: contentElements.length
       });
 
       return {
@@ -142,7 +153,6 @@ class ContentService {
         layout: slideData.layout || 'single',
         theme: activeTheme
       };
-
     } catch (error) {
       logger.error('Failed to add slide with content', { presentationId, slideData }, error);
       throw error;
@@ -162,7 +172,7 @@ class ContentService {
     const position = {
       x: this.layoutTemplates.single.margin,
       y: this.layoutTemplates.single.margin,
-      width: slideDimensions.width - (this.layoutTemplates.single.margin * 2),
+      width: slideDimensions.width - this.layoutTemplates.single.margin * 2,
       height: this.layoutTemplates.single.titleHeight
     };
 
@@ -175,7 +185,11 @@ class ContentService {
     };
 
     const _textBox = this.slidesService.insertTextBox(
-      presentationId, slideIndex, title, position, style
+      presentationId,
+      slideIndex,
+      title,
+      position,
+      style
     );
 
     return {
@@ -196,66 +210,138 @@ class ContentService {
    * @param {string} layout - Layout type
    * @returns {Promise<Array>} Content elements results
    */
-  async addContentElements(presentationId, slideIndex, content, slideDimensions, theme, layout = 'single') {
+  async addContentElements(
+    presentationId,
+    slideIndex,
+    content,
+    slideDimensions,
+    theme,
+    layout = 'single'
+  ) {
     const elements = [];
 
     for (let i = 0; i < content.length; i++) {
       const item = content[i];
-      
-      try {
-        let element;
-        
-        switch (item.type) {
-          case 'text':
-            element = await this.addTextElement(
-              presentationId, slideIndex, item, slideDimensions, theme, layout, i
-            );
-            break;
-            
-          case 'image':
-            element = await this.addImageElement(
-              presentationId, slideIndex, item, slideDimensions, layout, i
-            );
-            break;
-            
-          case 'table':
-            element = await this.addTableElement(
-              presentationId, slideIndex, item, slideDimensions, theme, layout, i
-            );
-            break;
-            
-          case 'mermaid':
-            element = await this.addMermaidElement(
-              presentationId, slideIndex, item, slideDimensions, layout, i
-            );
-            break;
-            
-          case 'svg':
-            element = await this.addSVGElement(
-              presentationId, slideIndex, item, slideDimensions, layout, i
-            );
-            break;
-            
-          default:
-            logger.warn('Unknown content type', { type: item.type, index: i });
-            continue;
-        }
-        
-        if (element) {
-          elements.push(element);
-        }
-        
-      } catch (error) {
-        logger.error('Failed to add content element', { 
-          type: item.type, 
-          index: i, 
-          presentationId, 
-          slideIndex 
-        }, error);
+      const element = await this.processContentItem(
+        presentationId,
+        slideIndex,
+        item,
+        slideDimensions,
+        theme,
+        layout,
+        i
+      );
+
+      if (element) {
+        elements.push(element);
       }
     }
 
     return elements;
+  }
+
+  /**
+   * Process a single content item
+   * @param {string} presentationId - Presentation ID
+   * @param {number} slideIndex - Slide index
+   * @param {Object} item - Content item
+   * @param {Object} slideDimensions - Slide dimensions
+   * @param {Object} theme - Theme configuration
+   * @param {string} layout - Layout type
+   * @param {number} index - Item index
+   * @returns {Promise<Object|null>} Processed element or null
+   */
+  async processContentItem(
+    presentationId,
+    slideIndex,
+    item,
+    slideDimensions,
+    theme,
+    layout,
+    index
+  ) {
+    try {
+      return await this.createElementByType(
+        item.type,
+        presentationId,
+        slideIndex,
+        item,
+        slideDimensions,
+        theme,
+        layout,
+        index
+      );
+    } catch (error) {
+      logger.error(
+        'Failed to add content element',
+        {
+          type: item.type,
+          index,
+          presentationId,
+          slideIndex
+        },
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Create element based on type
+   * @param {string} type - Element type
+   * @param {string} presentationId - Presentation ID
+   * @param {number} slideIndex - Slide index
+   * @param {Object} item - Content item
+   * @param {Object} slideDimensions - Slide dimensions
+   * @param {Object} theme - Theme configuration
+   * @param {string} layout - Layout type
+   * @param {number} index - Item index
+   * @returns {Promise<Object>} Created element
+   */
+  async createElementByType(
+    type,
+    presentationId,
+    slideIndex,
+    item,
+    slideDimensions,
+    theme,
+    layout,
+    index
+  ) {
+    const elementHandlers = this.getElementHandlers({
+      presentationId,
+      slideIndex,
+      item,
+      slideDimensions,
+      theme,
+      layout,
+      index
+    });
+
+    const handler = elementHandlers[type];
+    if (handler) {
+      return await handler();
+    }
+
+    logger.warn('Unknown content type', { type, index });
+    return null;
+  }
+
+  /**
+   * Get element handlers mapping
+   * @param {Object} params - Parameters object
+   * @returns {Object} Handler mapping object
+   */
+  getElementHandlers(params) {
+    const { presentationId: pId, slideIndex: sIdx, item, slideDimensions: dims } = params;
+    const { theme, layout, index } = params;
+    return {
+      text: () => this.addTextElement(pId, sIdx, item, dims, theme, layout, index),
+      image: () => this.addImageElement(pId, sIdx, item, dims, layout, index),
+      table: () => this.addTableElement(pId, sIdx, item, dims, theme, layout, index),
+      mermaid: () => this.addMermaidElement(pId, sIdx, item, dims, layout, index),
+      svg: () => this.addSVGElement(pId, sIdx, item, dims, layout, index)
+    };
   }
 
   /**
@@ -269,17 +355,26 @@ class ContentService {
    * @param {number} elementIndex - Element position index
    * @returns {Promise<Object>} Text element result
    */
-  async addTextElement(presentationId, slideIndex, textItem, slideDimensions, theme, layout, elementIndex) {
+  async addTextElement(
+    presentationId,
+    slideIndex,
+    textItem,
+    slideDimensions,
+    theme,
+    layout,
+    elementIndex
+  ) {
     const validation = this.validationService.validateSlideContent(textItem);
     if (!validation.isValid) {
       throw new Error(`Text validation failed: ${validation.errors.join(', ')}`);
     }
 
     const position = this.calculateContentPosition(slideDimensions, layout, elementIndex, 'text');
-    const fontSize = textItem.fontSize || 
+    const fontSize =
+      textItem.fontSize ||
       this.slidesService.calculateOptimalFontSize(
-        slideDimensions.width, 
-        slideDimensions.height, 
+        slideDimensions.width,
+        slideDimensions.height,
         textItem.text.length
       );
 
@@ -292,7 +387,11 @@ class ContentService {
     };
 
     const _textBox = this.slidesService.insertTextBox(
-      presentationId, slideIndex, validation.sanitized.text, position, style
+      presentationId,
+      slideIndex,
+      validation.sanitized.text,
+      position,
+      style
     );
 
     return {
@@ -313,17 +412,28 @@ class ContentService {
    * @param {number} elementIndex - Element position index
    * @returns {Promise<Object>} Image element result
    */
-  async addImageElement(presentationId, slideIndex, imageItem, slideDimensions, layout, elementIndex) {
+  async addImageElement(
+    presentationId,
+    slideIndex,
+    imageItem,
+    slideDimensions,
+    layout,
+    elementIndex
+  ) {
     const validation = this.validationService.validateImageParams(imageItem);
     if (!validation.isValid) {
       throw new Error(`Image validation failed: ${validation.errors.join(', ')}`);
     }
 
-    const position = imageItem.position || 
+    const position =
+      imageItem.position ||
       this.calculateContentPosition(slideDimensions, layout, elementIndex, 'image');
 
     const _image = this.slidesService.insertImage(
-      presentationId, slideIndex, validation.sanitized.source, position
+      presentationId,
+      slideIndex,
+      validation.sanitized.source,
+      position
     );
 
     return {
@@ -345,20 +455,34 @@ class ContentService {
    * @param {number} elementIndex - Element position index
    * @returns {Promise<Object>} Table element result
    */
-  async addTableElement(presentationId, slideIndex, tableItem, slideDimensions, theme, layout, elementIndex) {
+  async addTableElement(
+    presentationId,
+    slideIndex,
+    tableItem,
+    slideDimensions,
+    theme,
+    layout,
+    elementIndex
+  ) {
     const validation = this.validationService.validateTableData(tableItem.data);
     if (!validation.isValid) {
       throw new Error(`Table validation failed: ${validation.errors.join(', ')}`);
     }
 
-    const position = tableItem.position || 
+    const position =
+      tableItem.position ||
       this.calculateContentPosition(slideDimensions, layout, elementIndex, 'table');
 
     const rows = validation.sanitized.length;
     const columns = Math.max(...validation.sanitized.map(row => row.length));
 
     const _table = this.slidesService.insertTable(
-      presentationId, slideIndex, rows, columns, position, validation.sanitized
+      presentationId,
+      slideIndex,
+      rows,
+      columns,
+      position,
+      validation.sanitized
     );
 
     return {
@@ -380,13 +504,21 @@ class ContentService {
    * @param {number} elementIndex - Element position index
    * @returns {Promise<Object>} Mermaid element result
    */
-  async addMermaidElement(presentationId, slideIndex, mermaidItem, slideDimensions, layout, elementIndex) {
+  async addMermaidElement(
+    presentationId,
+    slideIndex,
+    mermaidItem,
+    slideDimensions,
+    layout,
+    elementIndex
+  ) {
     const validation = this.validationService.validateMermaidCode(mermaidItem.code);
     if (!validation.isValid) {
       throw new Error(`Mermaid validation failed: ${validation.errors.join(', ')}`);
     }
 
-    const position = mermaidItem.position || 
+    const position =
+      mermaidItem.position ||
       this.calculateContentPosition(slideDimensions, layout, elementIndex, 'diagram');
 
     const svgContent = await this.convertMermaidToSVG(validation.sanitized);
@@ -415,11 +547,15 @@ class ContentService {
       throw new Error(`SVG validation failed: ${validation.errors.join(', ')}`);
     }
 
-    const position = svgItem.position || 
+    const position =
+      svgItem.position ||
       this.calculateContentPosition(slideDimensions, layout, elementIndex, 'diagram');
 
     const _image = this.slidesService.insertSVG(
-      presentationId, slideIndex, validation.sanitized, position
+      presentationId,
+      slideIndex,
+      validation.sanitized,
+      position
     );
 
     return {
@@ -440,33 +576,33 @@ class ContentService {
   calculateContentPosition(slideDimensions, layout, elementIndex, elementType) {
     const template = this.layoutTemplates[layout] || this.layoutTemplates.single;
     const { margin, titleHeight, contentSpacing } = template;
-    
+
     const startY = margin + titleHeight + contentSpacing;
-    
+
     if (layout === 'single') {
       const elementHeight = this.getElementHeight(elementType);
       return {
         x: margin,
-        y: startY + (elementIndex * (elementHeight + contentSpacing)),
-        width: slideDimensions.width - (margin * 2),
+        y: startY + elementIndex * (elementHeight + contentSpacing),
+        width: slideDimensions.width - margin * 2,
         height: elementHeight
       };
     }
-    
+
     if (layout === 'double') {
-      const columnWidth = (slideDimensions.width - (margin * 2) - template.columnGap) / 2;
+      const columnWidth = (slideDimensions.width - margin * 2 - template.columnGap) / 2;
       const column = elementIndex % 2;
       const row = Math.floor(elementIndex / 2);
       const elementHeight = this.getElementHeight(elementType);
-      
+
       return {
-        x: margin + (column * (columnWidth + template.columnGap)),
-        y: startY + (row * (elementHeight + contentSpacing)),
+        x: margin + column * (columnWidth + template.columnGap),
+        y: startY + row * (elementHeight + contentSpacing),
         width: columnWidth,
         height: elementHeight
       };
     }
-    
+
     throw new Error(`Unsupported layout: ${layout}`);
   }
 
@@ -482,7 +618,7 @@ class ContentService {
       table: 150,
       diagram: 250
     };
-    
+
     return heights[elementType] || 100;
   }
 
@@ -494,13 +630,15 @@ class ContentService {
   async convertMermaidToSVG(mermaidCode) {
     try {
       logger.debug('Converting Mermaid to SVG', { codeLength: mermaidCode.length });
-      
-      const response = UrlFetchApp.fetch('https://mermaid.ink/svg/' + 
-        Utilities.base64Encode(mermaidCode), {
-        method: 'GET',
-        headers: { 'Accept': 'image/svg+xml' }
-      });
-      
+
+      const response = UrlFetchApp.fetch(
+        'https://mermaid.ink/svg/' + Utilities.base64Encode(mermaidCode),
+        {
+          method: 'GET',
+          headers: { Accept: 'image/svg+xml' }
+        }
+      );
+
       if (response.getResponseCode() === 200) {
         return response.getContentText();
       } else {
@@ -521,13 +659,13 @@ class ContentService {
   async getSlideIndex(presentationId, slide) {
     const presentation = this.slidesService.openPresentation(presentationId);
     const slides = presentation.getSlides();
-    
+
     for (let i = 0; i < slides.length; i++) {
       if (slides[i].getObjectId() === slide.getObjectId()) {
         return i;
       }
     }
-    
+
     throw new Error('Could not determine slide index');
   }
 
@@ -540,29 +678,28 @@ class ContentService {
   async applyTheme(presentationId, theme) {
     try {
       logger.info('Applying theme to presentation', { presentationId, theme });
-      
+
       const presentation = this.slidesService.openPresentation(presentationId);
       const slides = presentation.getSlides();
-      
+
       const results = [];
-      
+
       for (let i = 0; i < slides.length; i++) {
         const slideResult = await this.applyThemeToSlide(presentationId, i, theme);
         results.push(slideResult);
       }
-      
-      logger.info('Theme applied successfully', { 
-        presentationId, 
-        slidesProcessed: results.length 
+
+      logger.info('Theme applied successfully', {
+        presentationId,
+        slidesProcessed: results.length
       });
-      
+
       return {
         presentationId,
         theme,
         slidesProcessed: results.length,
         results
       };
-      
     } catch (error) {
       logger.error('Failed to apply theme', { presentationId, theme }, error);
       throw error;
@@ -580,25 +717,25 @@ class ContentService {
     const presentation = this.slidesService.openPresentation(presentationId);
     const slide = presentation.getSlides()[slideIndex];
     const shapes = slide.getShapes();
-    
+
     let elementsUpdated = 0;
-    
+
     shapes.forEach(shape => {
       if (shape.getShapeType() === SlidesApp.ShapeType.TEXT_BOX) {
         const text = shape.getText();
         const textStyle = text.getTextStyle();
-        
+
         if (theme.fontFamily) {
           textStyle.setFontFamily(theme.fontFamily);
         }
         if (theme.primaryColor) {
           textStyle.setForegroundColor(theme.primaryColor);
         }
-        
+
         elementsUpdated++;
       }
     });
-    
+
     return {
       slideIndex,
       elementsUpdated

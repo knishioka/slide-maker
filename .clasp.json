@@ -6,7 +6,7 @@
   "filePushOrder": [
     "main.js",
     "services/slides.js",
-    "services/layout.js", 
+    "services/layout.js",
     "services/content.js",
     "services/mermaid.js",
     "utils/design.js",

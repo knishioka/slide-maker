@@ -6,38 +6,38 @@ module.exports = {
   semi: true,
   singleQuote: true,
   quoteProps: 'as-needed',
-  
+
   // JSX (not applicable for GAS but good to have)
   jsxSingleQuote: true,
-  
+
   // Trailing commas
   trailingComma: 'none',
-  
+
   // Spacing
   bracketSpacing: true,
   bracketSameLine: false,
-  
+
   // Arrow functions
   arrowParens: 'avoid',
-  
+
   // Prose formatting
   proseWrap: 'preserve',
-  
+
   // HTML whitespace
   htmlWhitespaceSensitivity: 'css',
-  
+
   // Vue files (not applicable but good to have)
   vueIndentScriptAndStyle: false,
-  
+
   // End of line
   endOfLine: 'lf',
-  
+
   // Embedded language formatting
   embeddedLanguageFormatting: 'auto',
-  
+
   // Single attribute per line
   singleAttributePerLine: false,
-  
+
   // Override for specific file types
   overrides: [
     {

@@ -1,6 +1,7 @@
 # Google Slides Content Generator
 
-Google Apps ScriptベースのGoogle Slidesコンテンツ自動生成サービス。ダブルカラム・シングルカラムレイアウト、SVG・Mermaid図の挿入、フォント・カラーテーマの制御を提供します。
+Google Apps ScriptベースのGoogle
+Slidesコンテンツ自動生成サービス。ダブルカラム・シングルカラムレイアウト、SVG・Mermaid図の挿入、フォント・カラーテーマの制御を提供します。
 
 ## 🚀 機能
 
@@ -83,7 +84,7 @@ npm run format
 # 開発環境
 npm run deploy:dev
 
-# 本番環境  
+# 本番環境
 npm run deploy:prod
 ```
 
@@ -129,6 +130,7 @@ pre-commit install
 ```
 
 自動実行される検査:
+
 - ESLint (構文チェック + 自動修正)
 - Prettier (コードフォーマット)
 - テスト実行
@@ -189,21 +191,24 @@ MIT License - 詳細は [LICENSE](LICENSE) ファイルを参照
 ### よくある問題
 
 **Q: clasp認証エラーが発生する**
+
 ```bash
 # 再認証を実行
 npx clasp login --creds credentials.json
 ```
 
 **Q: API制限エラーが発生する**
+
 - Google APIs Console で使用量確認
 - レート制限の実装確認
 
 **Q: デプロイが失敗する**
+
 ```bash
 # バージョン確認
 npx clasp versions
 
-# 手動デプロイ  
+# 手動デプロイ
 npx clasp deploy
 ```
 

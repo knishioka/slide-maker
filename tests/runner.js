@@ -9,6 +9,9 @@ const fs = require('fs');
 const path = require('path');
 
 class TestRunner {
+  /**
+   * Initialize TestRunner
+   */
   constructor() {
     this.testResults = {
       passed: 0,
@@ -99,17 +102,19 @@ class TestRunner {
   /**
    * Load test files based on type
    * @param {string} testType - unit, integration, or e2e
+   * @returns {Array} Array of test file paths
    */
   loadTestFiles(testType) {
     const testDir = path.join(__dirname, testType);
-    
+
     if (!fs.existsSync(testDir)) {
       console.log(`📁 Creating test directory: ${testDir}`);
       fs.mkdirSync(testDir, { recursive: true });
       return [];
     }
 
-    const files = fs.readdirSync(testDir)
+    const files = fs
+      .readdirSync(testDir)
       .filter(file => file.endsWith('.test.js'))
       .map(file => path.join(testDir, file));
 
@@ -121,8 +126,8 @@ class TestRunner {
    */
   setupGASMocks() {
     global.console = console;
-    
-    // Mock GAS Services
+
+    // Mock GAS Services using improved mock implementation
     global.SlidesApp = {
       create: this.mockFn(() => ({ getId: () => 'mock-presentation-id' })),
       openById: this.mockFn(() => ({
@@ -214,15 +219,17 @@ class TestRunner {
       }
     };
 
-    global.expect = (actual) => ({
-      toBe: (expected) => {
+    global.expect = actual => ({
+      toBe: expected => {
         if (actual !== expected) {
           throw new Error(`Expected ${expected}, but got ${actual}`);
         }
       },
-      toEqual: (expected) => {
+      toEqual: expected => {
         if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-          throw new Error(`Expected ${JSON.stringify(expected)}, but got ${JSON.stringify(actual)}`);
+          throw new Error(
+            `Expected ${JSON.stringify(expected)}, but got ${JSON.stringify(actual)}`
+          );
         }
       },
       toBeTruthy: () => {
@@ -470,7 +477,7 @@ class TestRunner {
       func();
     };
 
-    global.afterEach = (func) => {
+    global.afterEach = func => {
       // Simple implementation - just run after each test
       func();
     };
@@ -482,12 +489,12 @@ class TestRunner {
    */
   async run(testType = 'unit') {
     console.log(`🧪 Running ${testType} tests...\n`);
-    
+
     this.setupGASMocks();
     this.setupTestFramework();
 
     const testFiles = this.loadTestFiles(testType);
-    
+
     if (testFiles.length === 0) {
       console.log(`⚠️  No test files found in tests/${testType}/`);
       console.log('💡 Create test files with .test.js extension in that directory');
@@ -519,7 +526,7 @@ class TestRunner {
     console.log(`Total Tests: ${this.testResults.total}`);
     console.log(`✅ Passed: ${this.testResults.passed}`);
     console.log(`❌ Failed: ${this.testResults.failed}`);
-    
+
     if (this.testResults.failures.length > 0) {
       console.log('\n🔍 Failure Details:');
       this.testResults.failures.forEach((failure, index) => {
@@ -530,7 +537,7 @@ class TestRunner {
 
     const successRate = ((this.testResults.passed / this.testResults.total) * 100).toFixed(1);
     console.log(`\n📈 Success Rate: ${successRate}%`);
-    
+
     if (this.testResults.failed > 0) {
       process.exit(1);
     }
@@ -538,22 +545,22 @@ class TestRunner {
 
   /**
    * Watch mode for continuous testing
+   * @param {string} testType - Type of tests to watch
    */
   watch(testType = 'unit') {
     console.log(`👀 Watching for changes in tests/${testType}/...\n`);
-    
+
     const testDir = path.join(__dirname, testType);
     if (!fs.existsSync(testDir)) {
       fs.mkdirSync(testDir, { recursive: true });
     }
 
     const chokidar = require('chokidar');
-    chokidar.watch(testDir, { ignored: /node_modules/ })
-      .on('change', () => {
-        console.clear();
-        this.testResults = { passed: 0, failed: 0, total: 0, failures: [] };
-        this.run(testType);
-      });
+    chokidar.watch(testDir, { ignored: /node_modules/ }).on('change', () => {
+      console.clear();
+      this.testResults = { passed: 0, failed: 0, total: 0, failures: [] };
+      this.run(testType);
+    });
   }
 }
 
@@ -564,7 +571,7 @@ if (require.main === module) {
   const isWatch = args.includes('--watch');
 
   const runner = new TestRunner();
-  
+
   if (isWatch) {
     runner.watch(testType);
   } else {
