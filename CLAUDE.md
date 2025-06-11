@@ -161,7 +161,106 @@ const Logger = {
 # TaskツールまたはGrepツールを活用
 ```
 
-### 11. エラーハンドリング戦略
+### 11. Claude Code開発時の進捗可視化
+
+#### 開発セッション開始時のテンプレート
+```markdown
+## 🚧 開発中: [TASK-XXX] [タスク名]
+
+### 📝 タスク概要
+- **目的**: [何を実現するためのタスクか]
+- **影響範囲**: [変更するファイル・機能]  
+- **期限**: [想定完了時期]
+
+### 📋 実装計画
+- [ ] **調査フェーズ** (25%)
+  - [ ] 既存コード分析 (src/services/, src/utils/)
+  - [ ] 依存関係確認
+  - [ ] API仕様確認
+- [ ] **設計フェーズ** (15%)
+  - [ ] アーキテクチャ設計
+  - [ ] インターフェース定義
+  - [ ] データフロー設計
+- [ ] **実装フェーズ** (40%)
+  - [ ] コア機能実装
+  - [ ] エラーハンドリング
+  - [ ] ログ・監視実装
+- [ ] **テストフェーズ** (15%)
+  - [ ] ユニットテスト作成
+  - [ ] 統合テスト実行
+  - [ ] 手動テスト実施
+- [ ] **品質保証フェーズ** (5%)
+  - [ ] コードレビュー準備
+  - [ ] ドキュメント更新
+  - [ ] パフォーマンステスト
+
+### 📊 現在の進捗: XX% (X/Y完了)
+### 🎯 次回セッションの優先作業: [具体的な次の作業]
+
+### ✅ 完了定義 (Definition of Done)
+- [ ] 機能要件をすべて満たしている
+- [ ] ユニットテストカバレッジ80%以上
+- [ ] 統合テストが全て通過
+- [ ] ESLint警告0件
+- [ ] ドキュメント更新完了
+- [ ] コードレビュー承認済み
+- [ ] TASKS.mdステータス更新完了
+
+---
+**🔔 タスク完了確認**
+- [ ] ✅ [TASK-XXX] の完了をTASKS.mdで確認
+- [ ] 🧹 Worktreeクリーンアップ実施
+- [ ] 📝 完了報告を関係者に共有
+```
+
+#### 進捗確認スクリプト活用
+```bash
+# タスク進捗の確認・更新
+./scripts/track-task-progress.sh TASK-001 start    # 開発開始
+./scripts/track-task-progress.sh TASK-001 update   # 進捗更新
+./scripts/track-task-progress.sh TASK-001 checklist # 完了確認
+./scripts/track-task-progress.sh TASK-001 complete  # 完了処理
+
+# 定期的な進捗チェック（30分〜1時間ごと推奨）
+./scripts/track-task-progress.sh TASK-001 milestone
+```
+
+#### TodoWriteツールとの連携
+```markdown
+# Claude Code開発開始時に必ずTodoWriteで計画管理
+TodoWrite: [
+  {"content": "TASK-001: 既存コード分析完了", "status": "completed", "priority": "high"},
+  {"content": "TASK-001: アーキテクチャ設計", "status": "in_progress", "priority": "high"},
+  {"content": "TASK-001: コア機能実装", "status": "pending", "priority": "high"},
+  {"content": "TASK-001: テスト作成", "status": "pending", "priority": "medium"},
+  {"content": "TASK-001: ドキュメント更新", "status": "pending", "priority": "low"}
+]
+
+# 進捗に応じて定期的に更新
+```
+
+#### 中断・再開時のコンテキスト保持
+```markdown
+## 🔄 [TASK-XXX] セッション中断 - [時刻]
+
+### ✅ 本セッションで完了した作業
+- [x] [完了項目1] - [完了時刻] 
+- [x] [完了項目2] - [完了時刻]
+
+### 🚧 中断時点での作業状況
+- **作業中ファイル**: [現在編集中のファイル]
+- **実装状況**: [どこまで実装したか]
+- **次の作業**: [中断後すぐに取り組むべき作業]
+
+### 📋 次回セッション開始時の注意点
+- **確認事項**: [再開前に確認すべきこと]
+- **ブロッカー**: [作業継続の障害要因]
+- **推定残り時間**: [完了までの想定時間]
+
+### 📊 進捗率: XX% (前回から+YY%)
+```
+
+### 12. エラーハンドリング戦略
 
 ```javascript
 // 標準エラーハンドリングパターン
@@ -211,13 +310,14 @@ function executeWithRetry(fn, maxRetries = 3) {
 # - Worktree: feature/task-xxx-description
 # - 開始日: YYYY-MM-DD
 
-# 2. 専用worktree作成
-git worktree add -b feature/task-001-layout-engine ../task-001-layout-engine
-cd ../task-001-layout-engine
+# 2. 専用worktree作成・進捗トラッキング開始
+./scripts/start-task.sh TASK-001
+./scripts/track-task-progress.sh TASK-001 start
 
 # 3. 開発開始
 # - 既存パターン踏襲
 # - 定期的なテスト実行
+# - 定期的な進捗更新: ./scripts/track-task-progress.sh TASK-001 update
 # - コミット前lint実行
 ```
 
@@ -328,3 +428,161 @@ git worktree list
 - **権限エラー**: appsscript.jsonのoauthScopesに必要権限追加
 - **デプロイエラー**: `clasp versions`でバージョン確認後`clasp deploy`
 - **Node.jsバージョンエラー**: `asdf install nodejs` でバージョンインストール後 `asdf local nodejs <version>`
+
+## 11. Claude Code開発時の進捗可視化システム
+
+### 📊 システム概要
+
+Claude Code使用時に**現在何をしているのか**、**どこまで進んでいるのか**、**何が残っているのか**を明確に把握するためのシステム。開発途中でも状況が分かり、タスク完了の見落としを防ぐ。
+
+### 🎯 解決する課題
+
+- **途中参入時の混乱**: 開発の途中から見ても何をやっているかわからない
+- **進捗の不透明性**: どこまで完了して何が残っているか不明
+- **タスク完了の見落とし**: 重要な作業が抜け落ちるリスク
+- **レビュー時の困難**: コードレビュー時に開発意図が不明
+
+### 🔧 実装ツール
+
+#### 進捗トラッキングスクリプト
+```bash
+# タスク開始時
+./scripts/track-task-progress.sh TASK-001 start
+
+# 開発中の進捗更新
+./scripts/track-task-progress.sh TASK-001 update
+
+# 完了確認チェックリスト
+./scripts/track-task-progress.sh TASK-001 checklist
+
+# タスク完了時
+./scripts/track-task-progress.sh TASK-001 complete
+```
+
+### 📋 Claude Code開発テンプレート
+
+#### セッション開始時
+```markdown
+## 🚀 [TASK-XXX] 開発開始
+
+**開発対象**: [機能名]
+**担当者**: Claude AI
+**開始時刻**: [YYYY-MM-DD HH:MM]
+**予想所要時間**: [X時間]
+
+### 📋 今回のセッションで実装予定
+1. [ ] [具体的な実装項目1]
+2. [ ] [具体的な実装項目2]
+3. [ ] [具体的な実装項目3]
+
+### 🔗 関連リソース
+- **TASKS.md**: Line XXX
+- **技術仕様**: docs/technical-specification.md
+- **Worktree**: feature/task-xxx-description
+```
+
+#### 進捗更新時（30分ごと）
+```markdown
+## 📈 [TASK-XXX] 進捗更新 - [現在時刻]
+
+### ✅ 完了した作業
+- [x] [実装項目1] - [完了時刻]
+- [x] [実装項目2] - [完了時刻]
+
+### 🚧 現在作業中
+- [ ] [現在の作業内容]
+
+### 📋 次に予定している作業
+- [ ] [次の作業項目1]
+- [ ] [次の作業項目2]
+
+### 📊 進捗率: XX% (前回から+YY%)
+
+---
+⏰ **進捗チェックポイント** ([現在時刻])
+
+🎯 **完了確認**
+- [ ] ✅ [現在作業]を完了したらTODOリスト更新
+- [ ] 📝 実装完了後に次タスクを開始
+- [ ] 🔄 TASKS.mdの進捗率を更新
+```
+
+#### セッション終了時
+```markdown
+## 🎯 [TASK-XXX] セッション完了報告
+
+### ✅ 本セッションの成果
+- [x] [完了項目1]
+- [x] [完了項目2]
+- [x] [完了項目3]
+
+### 📋 残作業
+- [ ] [未完了項目1] - 推定XX分
+- [ ] [未完了項目2] - 推定XX分
+
+### 🔄 次回セッションの準備
+- **優先作業**: [次回最初に取り組む作業]
+- **準備事項**: [事前に確認・準備すべきこと]
+- **ブロッカー**: [作業を進める上での障害]
+
+### 📊 全体進捗: XX% (推定残り時間: XX時間)
+
+---
+**🔔 タスク完了確認**
+- [ ] ✅ [TASK-XXX] の完了をTASKS.mdで確認
+- [ ] 🧹 Worktreeクリーンアップ実施
+- [ ] 📝 完了報告を関係者に共有
+```
+
+### 🎉 タスク完了チェックリスト
+
+#### 必須項目
+- [ ] **機能実装完了**: すべての要件を満たしている
+- [ ] **テスト完了**: ユニット・統合テストが通過
+- [ ] **品質確認**: `npm run lint && npm run test && npm run build` が通過
+- [ ] **ドキュメント**: README、API仕様、コメントが更新
+- [ ] **TASKS.md更新**: ステータスをDONEに変更
+
+#### 推奨項目
+- [ ] **パフォーマンス**: 性能劣化がないことを確認
+- [ ] **セキュリティ**: 脆弱性スキャン実施
+- [ ] **互換性**: 既存機能への影響確認
+- [ ] **ユーザビリティ**: 使いやすさの確認
+
+#### クリーンアップ
+- [ ] **Worktree削除**: `./scripts/complete-task.sh TASK-XXX`
+- [ ] **ブランチクリーンアップ**: マージ済みブランチを削除
+- [ ] **テンポラリファイル削除**: 作業中ファイルを削除
+
+### 🔗 TodoWrite統合
+
+#### Claude Codeセッション管理
+```javascript
+// セッション開始時
+TodoWrite([
+  {"content": "TASK-001: 調査フェーズ完了", "status": "completed", "priority": "high"},
+  {"content": "TASK-001: 設計フェーズ完了", "status": "completed", "priority": "high"},
+  {"content": "TASK-001: コア機能実装", "status": "in_progress", "priority": "high"},
+  {"content": "TASK-001: エラーハンドリング実装", "status": "pending", "priority": "medium"},
+  {"content": "TASK-001: テスト作成", "status": "pending", "priority": "high"}
+]);
+```
+
+### 📱 活用方法
+
+#### 開発開始時
+1. `./scripts/track-task-progress.sh TASK-XXX start` でセッション開始
+2. TodoWriteでサブタスクリストを作成
+3. 進捗テンプレートを使用してコンテキストを明示
+
+#### 開発中
+1. 30分ごとに進捗更新テンプレートを使用
+2. TodoWriteで完了したサブタスクをupdateします
+3. 重要な確認事項を定期的にチェック
+
+#### 開発完了時
+1. 完了チェックリストで全項目を確認
+2. `./scripts/track-task-progress.sh TASK-XXX complete` で最終確認
+3. TASKS.mdステータス更新とworktreeクリーンアップ
+
+この進捗可視化システムにより、Claude Code開発時に常に現在の状況が把握でき、タスクの取りこぼしを防げます。
