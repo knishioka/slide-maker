@@ -9,6 +9,7 @@ class ContentService {
   constructor() {
     this.slidesService = new SlidesService();
     this.validationService = new ValidationService();
+    this.chartService = new ChartService();
 
     this.defaultTheme = {
       fontFamily: 'Arial',
@@ -339,6 +340,7 @@ class ContentService {
       text: () => this.addTextElement(pId, sIdx, item, dims, theme, layout, index),
       image: () => this.addImageElement(pId, sIdx, item, dims, layout, index),
       table: () => this.addTableElement(pId, sIdx, item, dims, theme, layout, index),
+      chart: () => this.addChartElement(pId, sIdx, item, dims, theme, layout, index),
       mermaid: () => this.addMermaidElement(pId, sIdx, item, dims, layout, index),
       svg: () => this.addSVGElement(pId, sIdx, item, dims, layout, index)
     };
@@ -532,6 +534,52 @@ class ContentService {
   }
 
   /**
+   * Add chart element to slide
+   * @param {string} presentationId - Presentation ID
+   * @param {number} slideIndex - Slide index
+   * @param {Object} chartItem - Chart item configuration
+   * @param {Object} slideDimensions - Slide dimensions
+   * @param {Object} theme - Theme configuration
+   * @param {string} layout - Layout type
+   * @param {number} elementIndex - Element position index
+   * @returns {Promise<Object>} Chart element result
+   */
+  async addChartElement(
+    presentationId,
+    slideIndex,
+    chartItem,
+    slideDimensions,
+    theme,
+    layout,
+    elementIndex
+  ) {
+    const validation = this.chartService.validateChartConfig(chartItem);
+    if (!validation.isValid) {
+      throw new Error(`Chart validation failed: ${validation.errors.join(', ')}`);
+    }
+
+    const position =
+      chartItem.position ||
+      this.calculateContentPosition(slideDimensions, layout, elementIndex, 'chart');
+
+    const chartResult = await this.chartService.createChart(
+      presentationId,
+      slideIndex,
+      validation.sanitized,
+      position,
+      theme
+    );
+
+    return {
+      type: 'chart',
+      chartType: validation.sanitized.chartType,
+      position,
+      dataPoints: chartResult.dataPoints,
+      options: chartResult.options
+    };
+  }
+
+  /**
    * Add SVG element to slide
    * @param {string} presentationId - Presentation ID
    * @param {number} slideIndex - Slide index
@@ -616,6 +664,7 @@ class ContentService {
       text: 100,
       image: 200,
       table: 150,
+      chart: 300,
       diagram: 250
     };
 

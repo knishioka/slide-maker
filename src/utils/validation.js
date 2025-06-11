@@ -70,6 +70,25 @@ class ValidationService {
       'importScripts',
       'postMessage'
     ];
+
+    this.CHART_TYPES = [
+      'bar',
+      'column',
+      'line',
+      'area',
+      'pie',
+      'scatter',
+      'table',
+      'combo',
+      'gauge',
+      'radar',
+      'timeline',
+      'bubble',
+      'candlestick',
+      'histogram',
+      'treemap',
+      'waterfall'
+    ];
   }
 
   /**
@@ -712,6 +731,243 @@ class ValidationService {
   }
 
   /**
+   * Validate chart data and configuration
+   * @param {Object} chartData - Chart configuration object
+   * @returns {Object} Validation result
+   */
+  validateChartData(chartData) {
+    const errors = [];
+    const warnings = [];
+
+    if (!chartData || typeof chartData !== 'object') {
+      errors.push('Chart data must be an object');
+      return { isValid: false, errors, warnings };
+    }
+
+    // Validate chart type
+    if (!chartData.chartType) {
+      errors.push('Chart type is required');
+    } else if (!this.CHART_TYPES.includes(chartData.chartType)) {
+      errors.push(`Unsupported chart type: ${chartData.chartType}. Supported types: ${this.CHART_TYPES.join(', ')}`);
+    }
+
+    // Validate data array
+    if (!chartData.data || !Array.isArray(chartData.data)) {
+      errors.push('Chart data must be provided as an array');
+    } else {
+      const dataValidation = this.validateChartDataArray(chartData.data);
+      errors.push(...dataValidation.errors);
+      warnings.push(...dataValidation.warnings);
+    }
+
+    // Validate title if provided
+    if (chartData.title && typeof chartData.title !== 'string') {
+      errors.push('Chart title must be a string');
+    } else if (chartData.title && chartData.title.length > 100) {
+      warnings.push('Chart title is very long and may not display well');
+    }
+
+    // Validate options if provided
+    if (chartData.options && typeof chartData.options !== 'object') {
+      errors.push('Chart options must be an object');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+      sanitized: this.sanitizeChartData(chartData)
+    };
+  }
+
+  /**
+   * Validate chart data array structure
+   * @param {Array} dataArray - Chart data array
+   * @returns {Object} Validation result
+   */
+  validateChartDataArray(dataArray) {
+    const errors = [];
+    const warnings = [];
+
+    if (dataArray.length < 2) {
+      errors.push('Chart data must have at least 2 rows (header + data)');
+      return { errors, warnings };
+    }
+
+    if (dataArray.length > 1001) {
+      warnings.push('Chart has more than 1000 data points and may impact performance');
+    }
+
+    // Validate header row
+    const headers = dataArray[0];
+    if (!Array.isArray(headers) || headers.length < 2) {
+      errors.push('Chart data must have at least 2 columns (category + value)');
+      return { errors, warnings };
+    }
+
+    if (headers.length > 21) {
+      warnings.push('Chart has more than 20 data series and may be difficult to read');
+    }
+
+    // Check for empty headers
+    headers.forEach((header, index) => {
+      if (!header || (typeof header === 'string' && header.trim() === '')) {
+        warnings.push(`Column ${index + 1} has empty header`);
+      }
+    });
+
+    // Validate data rows
+    for (let i = 1; i < dataArray.length; i++) {
+      const row = dataArray[i];
+      
+      if (!Array.isArray(row)) {
+        errors.push(`Row ${i} must be an array`);
+        continue;
+      }
+
+      if (row.length !== headers.length) {
+        errors.push(`Row ${i} has ${row.length} columns, expected ${headers.length}`);
+      }
+
+      // Check for numeric data in value columns
+      for (let j = 1; j < row.length; j++) {
+        const value = row[j];
+        if (value !== null && value !== undefined && 
+            typeof value !== 'number' && isNaN(parseFloat(value))) {
+          warnings.push(`Row ${i}, Column ${j}: "${value}" is not numeric`);
+        }
+      }
+    }
+
+    return { errors, warnings };
+  }
+
+  /**
+   * Sanitize chart data object
+   * @param {Object} chartData - Chart data to sanitize
+   * @returns {Object} Sanitized chart data
+   */
+  sanitizeChartData(chartData) {
+    const sanitized = {};
+
+    if (chartData.chartType && this.CHART_TYPES.includes(chartData.chartType)) {
+      sanitized.chartType = chartData.chartType;
+    }
+
+    if (chartData.data && Array.isArray(chartData.data)) {
+      sanitized.data = this.sanitizeChartDataArray(chartData.data);
+    }
+
+    if (chartData.title) {
+      sanitized.title = this.sanitizeText(chartData.title);
+    }
+
+    if (chartData.options && typeof chartData.options === 'object') {
+      sanitized.options = this.sanitizeChartOptions(chartData.options);
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * Sanitize chart data array
+   * @param {Array} dataArray - Chart data array to sanitize
+   * @returns {Array} Sanitized data array
+   */
+  sanitizeChartDataArray(dataArray) {
+    if (!Array.isArray(dataArray) || dataArray.length === 0) {
+      return [];
+    }
+
+    return dataArray.map((row, rowIndex) => {
+      if (!Array.isArray(row)) {
+        return [];
+      }
+
+      return row.map((cell, cellIndex) => {
+        if (cellIndex === 0) {
+          // First column should be category labels (strings)
+          return this.sanitizeText(String(cell || ''));
+        } else {
+          // Subsequent columns should be numeric values
+          if (cell === null || cell === undefined || cell === '') {
+            return null;
+          }
+          const numValue = parseFloat(cell);
+          return isNaN(numValue) ? 0 : numValue;
+        }
+      });
+    });
+  }
+
+  /**
+   * Sanitize chart options object
+   * @param {Object} options - Chart options to sanitize
+   * @returns {Object} Sanitized options
+   */
+  sanitizeChartOptions(options) {
+    const sanitized = {};
+
+    // Sanitize dimensions
+    if (options.width !== undefined) {
+      const width = parseInt(options.width);
+      if (!isNaN(width) && width > 0) {
+        sanitized.width = Math.min(Math.max(width, 200), 1200);
+      }
+    }
+
+    if (options.height !== undefined) {
+      const height = parseInt(options.height);
+      if (!isNaN(height) && height > 0) {
+        sanitized.height = Math.min(Math.max(height, 150), 800);
+      }
+    }
+
+    // Sanitize colors
+    if (options.colors && Array.isArray(options.colors)) {
+      sanitized.colors = options.colors.filter(color => this.isValidColor(color));
+    }
+
+    if (options.backgroundColor && this.isValidColor(options.backgroundColor)) {
+      sanitized.backgroundColor = options.backgroundColor;
+    }
+
+    // Sanitize text properties
+    if (options.legend && typeof options.legend === 'string') {
+      const validLegendPositions = ['top', 'bottom', 'left', 'right', 'none'];
+      if (validLegendPositions.includes(options.legend.toLowerCase())) {
+        sanitized.legend = options.legend.toLowerCase();
+      }
+    }
+
+    // Sanitize boolean properties
+    ['stacked', 'smooth', 'is3D', 'gridlines', 'animation'].forEach(prop => {
+      if (options[prop] !== undefined) {
+        sanitized[prop] = Boolean(options[prop]);
+      }
+    });
+
+    // Sanitize numeric properties with bounds
+    const numericProperties = {
+      titleFontSize: { min: 8, max: 48 },
+      axisFontSize: { min: 6, max: 24 },
+      pointSize: { min: 1, max: 20 },
+      lineWidth: { min: 1, max: 10 }
+    };
+
+    Object.entries(numericProperties).forEach(([prop, bounds]) => {
+      if (options[prop] !== undefined) {
+        const value = parseFloat(options[prop]);
+        if (!isNaN(value)) {
+          sanitized[prop] = Math.min(Math.max(value, bounds.min), bounds.max);
+        }
+      }
+    });
+
+    return sanitized;
+  }
+
+  /**
    * Validate content performance impact
    * @param {Object} content - Content to validate
    * @returns {Object} Performance validation result
@@ -741,6 +997,20 @@ class ValidationService {
         issues.push('Table has too many cells and may impact slide performance');
       } else if (cellCount > 100) {
         recommendations.push('Consider breaking large table into smaller sections');
+      }
+    }
+
+    if (content.type === 'chart' && content.data) {
+      const dataPoints = (content.data.length - 1) * (content.data[0].length - 1);
+      if (dataPoints > 1000) {
+        issues.push('Chart has too many data points and may impact rendering performance');
+      } else if (dataPoints > 500) {
+        recommendations.push('Consider aggregating data points for better chart performance');
+      }
+
+      const seriesCount = content.data[0].length - 1;
+      if (seriesCount > 10) {
+        recommendations.push('Charts with many data series may be difficult to read');
       }
     }
 

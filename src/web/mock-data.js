@@ -73,8 +73,124 @@ const MOCK_CONTENT_TYPES = [
   { id: 'text', name: 'Text Block', icon: '📝' },
   { id: 'bullet', name: 'Bullet List', icon: '•' },
   { id: 'image', name: 'Image', icon: '🖼️' },
+  { id: 'chart', name: 'Chart & Graph', icon: '📈' },
   { id: 'mermaid', name: 'Mermaid Diagram', icon: '📊' },
   { id: 'svg', name: 'SVG Graphics', icon: '⚡' }
+];
+
+// Mock chart examples
+const MOCK_CHART_EXAMPLES = [
+  {
+    id: 'column',
+    name: 'Column Chart',
+    chartType: 'column',
+    title: 'Quarterly Sales Performance',
+    data: [
+      ['Quarter', 'Sales ($M)', 'Profit ($M)'],
+      ['Q1', 12.5, 2.8],
+      ['Q2', 14.2, 3.1],
+      ['Q3', 16.8, 3.9],
+      ['Q4', 19.1, 4.5]
+    ],
+    options: {
+      width: 600,
+      height: 400,
+      colors: ['#1f77b4', '#ff7f0e'],
+      legend: 'bottom'
+    }
+  },
+  {
+    id: 'pie',
+    name: 'Pie Chart',
+    chartType: 'pie',
+    title: 'Market Share Distribution',
+    data: [
+      ['Company', 'Market Share (%)'],
+      ['Our Company', 28.5],
+      ['Competitor A', 24.2],
+      ['Competitor B', 18.7],
+      ['Others', 28.6]
+    ],
+    options: {
+      width: 500,
+      height: 400,
+      is3D: false
+    }
+  },
+  {
+    id: 'line',
+    name: 'Line Chart',
+    chartType: 'line',
+    title: 'Monthly Revenue Trend',
+    data: [
+      ['Month', 'Revenue ($K)', 'Target ($K)'],
+      ['Jan', 85, 80],
+      ['Feb', 89, 85],
+      ['Mar', 92, 90],
+      ['Apr', 87, 88],
+      ['May', 94, 93],
+      ['Jun', 98, 95]
+    ],
+    options: {
+      smooth: true,
+      pointSize: 4,
+      lineWidth: 2
+    }
+  },
+  {
+    id: 'bar',
+    name: 'Bar Chart',
+    chartType: 'bar',
+    title: 'Regional Performance Comparison',
+    data: [
+      ['Region', 'Sales ($M)', 'Target ($M)'],
+      ['North America', 45.2, 42.0],
+      ['Europe', 38.7, 40.0],
+      ['Asia Pacific', 52.1, 48.0],
+      ['Latin America', 23.4, 25.0]
+    ],
+    options: {
+      orientation: 'horizontal',
+      stacked: false
+    }
+  },
+  {
+    id: 'area',
+    name: 'Area Chart',
+    chartType: 'area',
+    title: 'Website Traffic Over Time',
+    data: [
+      ['Date', 'Unique Visitors', 'Page Views'],
+      ['Week 1', 1250, 3200],
+      ['Week 2', 1480, 3800],
+      ['Week 3', 1320, 3400],
+      ['Week 4', 1650, 4200],
+      ['Week 5', 1890, 4800]
+    ],
+    options: {
+      stacked: true,
+      smooth: true
+    }
+  },
+  {
+    id: 'scatter',
+    name: 'Scatter Plot',
+    chartType: 'scatter',
+    title: 'Sales vs Marketing Spend',
+    data: [
+      ['Marketing Spend ($K)', 'Sales ($M)'],
+      [10, 15.2],
+      [15, 18.7],
+      [20, 22.1],
+      [25, 26.8],
+      [30, 31.2],
+      [35, 35.9]
+    ],
+    options: {
+      pointSize: 6,
+      trendlines: true
+    }
+  }
 ];
 
 // Mock Mermaid examples
@@ -200,6 +316,7 @@ if (typeof window !== 'undefined') {
     TEMPLATES: MOCK_TEMPLATES,
     LAYOUTS: MOCK_LAYOUTS,
     CONTENT_TYPES: MOCK_CONTENT_TYPES,
+    CHART_EXAMPLES: MOCK_CHART_EXAMPLES,
     MERMAID_EXAMPLES: MOCK_MERMAID_EXAMPLES,
     API_RESPONSES: MOCK_API_RESPONSES,
     PRESENTATION_HISTORY: MOCK_PRESENTATION_HISTORY,
