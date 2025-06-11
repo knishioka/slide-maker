@@ -151,14 +151,65 @@ pre-commit install
 
 ```javascript
 // シングルカラムレイアウトでスライド生成
-const generator = new SlideGenerator();
-const slide = await generator.createSlide({
-  layout: 'single-column',
+const layoutService = new LayoutService(slidesService);
+const result = layoutService.createLayout(presentationId, {
+  layoutType: 'single-column',
   theme: 'corporate',
   content: [
     { type: 'title', text: 'プレゼンテーションタイトル' },
-    { type: 'body', text: 'メインコンテンツの説明文...' },
-    { type: 'mermaid', code: 'graph TD; A-->B; B-->C;' }
+    { type: 'body', text: 'メインコンテンツの説明文...' }
+  ]
+});
+```
+
+### テンプレートベースレイアウト
+
+```javascript
+// ヒーロー・コンテンツテンプレートの使用
+const result = layoutService.createLayout(presentationId, {
+  template: 'hero-content',
+  theme: 'presentation',
+  responsive: true,
+  content: [
+    { type: 'title', text: 'インパクトのあるタイトル' },
+    { type: 'body', text: 'サポートコンテンツ...' }
+  ]
+});
+```
+
+### カスタムグリッドレイアウト
+
+```javascript
+// カスタムグリッドエリアの定義
+const customAreas = {
+  header: '1 / 1 / 2 / 13',
+  sidebar: '2 / 1 / 6 / 4', 
+  main: '2 / 4 / 6 / 13'
+};
+
+const result = layoutService.createLayout(presentationId, {
+  layoutType: 'custom-grid',
+  customAreas: customAreas,
+  responsive: true,
+  content: [
+    { type: 'heading', text: 'ヘッダー' },
+    { type: 'caption', text: 'サイドバー情報' },
+    { type: 'body', text: 'メインコンテンツ' }
+  ]
+});
+```
+
+### レスポンシブレイアウト
+
+```javascript
+// 画面サイズに応じて自動調整
+const result = layoutService.createLayout(presentationId, {
+  layoutType: 'responsive-grid',
+  content: [
+    { type: 'title', text: 'レスポンシブタイトル' },
+    { type: 'body', text: 'コンテンツ1' },
+    { type: 'body', text: 'コンテンツ2' },
+    { type: 'body', text: 'コンテンツ3' }
   ]
 });
 ```
