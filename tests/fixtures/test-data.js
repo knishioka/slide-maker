@@ -324,9 +324,257 @@ const testFixtures = {
         S->>G: Create Slides
         G-->>S: Slides Created
         S-->>A: Success Response
-        A-->>U: Presentation URL
+        A-->>U: Presentation Link
       `,
-      style: { theme: 'forest', backgroundColor: '#f9f9f9' }
+      interactive: true,
+      styleTemplate: 'professional',
+      exportFormats: ['svg', 'png', 'pdf'],
+      interactiveOptions: {
+        zoom: true,
+        pan: true,
+        clickable: true,
+        tooltips: true
+      },
+      clickHandlers: {
+        '.actor': { action: 'highlight', color: '#ff6b6b' },
+        '.message': { action: 'alert', message: 'Message clicked' }
+      },
+      tooltipData: {
+        '.actor': 'Click to highlight this actor',
+        '.message': 'This represents a message flow'
+      }
+    },
+
+    // Advanced Mermaid test cases
+    advancedMermaidTests: {
+      flowchartWithStyling: {
+        type: 'mermaid',
+        code: `
+          graph TD
+          A[User Input] --> B{Validation}
+          B -->|Valid| C[Process Data]
+          B -->|Invalid| D[Show Error]
+          C --> E[Generate Slides]
+          D --> F[Return to Form]
+          E --> G[Success]
+          
+          classDef startEnd fill:#e1f5fe,stroke:#01579b,stroke-width:3px
+          classDef process fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+          classDef decision fill:#fff3e0,stroke:#e65100,stroke-width:2px
+          
+          class A,G startEnd
+          class C,E process
+          class B decision
+        `,
+        styleTemplate: 'modern',
+        customTheme: {
+          primaryColor: '#673ab7',
+          lineColor: '#9c27b0'
+        },
+        interactive: true,
+        exportFormats: ['svg', 'png']
+      },
+
+      ganttChart: {
+        type: 'mermaid',
+        code: `
+          gantt
+          title Development Timeline
+          dateFormat YYYY-MM-DD
+          section Phase 1
+          Research & Planning    :done, phase1, 2024-01-01, 2024-01-15
+          Architecture Design   :done, arch, after phase1, 10d
+          section Phase 2
+          Core Development      :active, dev, 2024-02-01, 30d
+          Testing              :test, after dev, 15d
+          section Phase 3
+          Deployment           :deploy, after test, 10d
+          Documentation        :docs, after test, 20d
+        `,
+        styleTemplate: 'professional',
+        exportFormats: ['svg', 'pdf'],
+        width: 1000,
+        height: 400
+      },
+
+      entityRelationshipDiagram: {
+        type: 'mermaid',
+        code: `
+          erDiagram
+          USER {
+            string id PK
+            string email UK
+            string name
+            datetime created_at
+          }
+          PRESENTATION {
+            string id PK
+            string title
+            string user_id FK
+            json slides
+            datetime created_at
+            datetime updated_at
+          }
+          SLIDE {
+            string id PK
+            string presentation_id FK
+            int slide_number
+            json content
+            string layout_type
+          }
+          THEME {
+            string id PK
+            string name
+            json theme_config
+            boolean is_public
+          }
+          
+          USER ||--o{ PRESENTATION : creates
+          PRESENTATION ||--o{ SLIDE : contains
+          PRESENTATION }o--|| THEME : uses
+        `,
+        styleTemplate: 'minimal',
+        interactive: true,
+        exportFormats: ['svg'],
+        interactiveOptions: {
+          tooltips: true,
+          clickable: true
+        },
+        tooltipData: {
+          'rect': 'Database entity - click for details'
+        }
+      },
+
+      stateTransitionDiagram: {
+        type: 'mermaid',
+        code: `
+          stateDiagram-v2
+          [*] --> Idle
+          Idle --> Loading : user_action
+          Loading --> Processing : data_received
+          Loading --> Error : network_error
+          Processing --> Success : process_complete
+          Processing --> Error : process_failed
+          Success --> Idle : reset
+          Error --> Idle : retry
+          Error --> [*] : fatal_error
+          
+          Success : Entry/show_success_message
+          Error : Entry/log_error
+          Error : Entry/show_error_dialog
+        `,
+        styleTemplate: 'modern',
+        animations: {
+          'rect': 'pulse',
+          'path': 'fadeIn'
+        }
+      },
+
+      mindmapDiagram: {
+        type: 'mermaid',
+        code: `
+          mindmap
+          root((Slide Generator))
+            Content Types
+              Text
+              Images
+              Diagrams
+                Mermaid
+                  Flowcharts
+                  Sequence
+                  Gantt
+                SVG
+              Tables
+            Layout Options
+              Single Column
+              Double Column
+              Custom Grid
+            Export Formats
+              Google Slides
+              PDF
+              Images
+                PNG
+                JPEG
+                SVG
+        `,
+        styleTemplate: 'creative',
+        interactive: true,
+        exportFormats: ['svg', 'png']
+      },
+
+      pieChart: {
+        type: 'mermaid',
+        code: `
+          pie title Browser Usage Statistics
+          "Chrome" : 60.5
+          "Firefox" : 18.2
+          "Safari" : 12.8
+          "Edge" : 5.1
+          "Other" : 3.4
+        `,
+        styleTemplate: 'professional',
+        customTheme: {
+          pie1: '#ff6b6b',
+          pie2: '#4ecdc4',
+          pie3: '#45b7d1',
+          pie4: '#96ceb4',
+          pie5: '#fda085'
+        }
+      }
+    },
+
+    // Error cases for testing
+    mermaidErrorCases: {
+      invalidSyntax: {
+        type: 'mermaid',
+        code: 'invalid mermaid syntax here',
+        expectedError: 'Mermaid validation failed'
+      },
+      
+      emptyCode: {
+        type: 'mermaid',
+        code: '',
+        expectedError: 'Mermaid code is required'
+      },
+      
+      tooLongCode: {
+        type: 'mermaid',
+        code: 'graph TD\n' + 'A --> B\n'.repeat(10000),
+        expectedError: 'Mermaid code is too long'
+      },
+      
+      invalidExportFormat: {
+        type: 'mermaid',
+        code: 'graph TD\nA --> B',
+        exportFormats: ['invalid_format'],
+        expectedError: 'Invalid export formats'
+      }
+    },
+
+    // Performance test cases
+    mermaidPerformanceTests: {
+      largeFlowchart: {
+        type: 'mermaid',
+        code: `
+          graph TD
+          ${Array.from({length: 50}, (_, i) => `A${i}[Node ${i}] --> A${i+1}[Node ${i+1}]`).join('\n')}
+        `,
+        complexity: 'high',
+        expectedRenderTime: 5000 // ms
+      },
+      
+      complexSequence: {
+        type: 'mermaid',
+        code: `
+          sequenceDiagram
+          ${Array.from({length: 20}, (_, i) => 
+            `participant P${i} as Participant ${i}\n` +
+            Array.from({length: 10}, (_, j) => `P${i}->>P${(i+1)%20}: Message ${j}`).join('\n')
+          ).join('\n')}
+        `,
+        complexity: 'very_high',
+        expectedRenderTime: 8000 // ms
+      }
     },
 
     shapeContent: {
