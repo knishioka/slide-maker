@@ -1,26 +1,39 @@
 /**
  * Google Slides Content Generator - Main Entry Point
- * Provides the primary API for slide generation and management
+ * External Data Sources Integration (TASK-006)
+ * 
+ * Main script for Google Apps Script integration with external data sources
+ * Supports Google Sheets, API endpoints, CSV, and JSON data import
  */
 
 /**
- * Initialize the slide generator services
- * This function should be called before using any other functions
- * @returns {boolean} True if initialization successful
+ * Initialize services with external data source capabilities
+ * @returns {Object} Initialized services
  */
 function initializeServices() {
   try {
-    logger.info('Initializing Slide Generator services');
+    logger.info('Initializing Slide Generator services with external data sources');
 
-    // Test service initialization
-    const _slidesService = new SlidesService();
-    const _contentService = new ContentService();
-    const _validationService = new ValidationService();
-    const _themeService = new ThemeService();
-    const _layoutService = new LayoutService(_slidesService, _themeService);
+    // Initialize core services
+    const slidesService = new SlidesService();
+    const contentService = new ContentService();
+    const validationService = new ValidationService();
+    
+    // Initialize external data source services
+    const dataSourceService = new DataSourceService();
+    const dataTransformService = new DataTransformService();
+    
+    // Connect external data services to content service
+    contentService.initializeDataSourceServices(dataSourceService, dataTransformService);
 
     logger.info('All services initialized successfully');
-    return true;
+    return {
+      slidesService,
+      contentService,
+      validationService,
+      dataSourceService,
+      dataTransformService
+    };
   } catch (error) {
     logger.error('Failed to initialize services', null, error);
     return false;

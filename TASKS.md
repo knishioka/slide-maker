@@ -83,14 +83,17 @@
   - **Status**: IN_PROGRESS
   - **Started**: 2025-01-11
 
-- [ ] 📝 **[TASK-006]** External Data Sources Integration
+- [x] ✅ **[TASK-006]** External Data Sources Integration
   - **Priority**: Medium
   - **Estimate**: 5 days
   - **Dependencies**: API Development
   - **Description**: Google Sheets, CSV, JSON data import
-  - **Assignee**: -
-  - **Worktree**: -
-  - **Status**: TODO
+  - **Assignee**: Claude AI
+  - **Worktree**: feature/task-006-external-data-sources-integration
+  - **Status**: DONE
+  - **Started**: 2025-06-11
+  - **Completed**: 2025-06-11
+  - **Deliverables**: DataSourceService, DataTransformService, ValidationService拡張, ContentService統合, 包括的テストスイート
 
 #### 🖥️ User Interface
 - [ ] 📝 **[TASK-007]** Web Dashboard Development
@@ -244,9 +247,9 @@ git branch -d feature/task-001-layout-engine
 ### Sprint 1 (Current)
 - **期間**: 2025/01/01 - 2025/01/31
 - **目標**: Core Infrastructure & Layout System
-- **完了**: 4/15 tasks (27%)
-- **進行中**: 0/15 tasks
-- **予定**: 11/15 tasks
+- **完了**: 5/15 tasks (33%)
+- **進行中**: 1/15 tasks
+- **予定**: 9/15 tasks
 
 ### Sprint 2 (Planned)
 - **期間**: 2025/02/01 - 2025/02/28
@@ -279,6 +282,7 @@ git branch -d feature/task-001-layout-engine
 | 2025-01-11 | Core Services | DONE | Claude | Enhanced with advanced functionality |
 | 2025-01-11 | Task Management | IN_PROGRESS | Claude | Creating centralized task tracking |
 | 2025-06-11 | Theme Management System | DONE | Claude | Complete theme system with color palettes, fonts, and layout integration |
+| 2025-06-11 | External Data Sources Integration | DONE | Claude | Comprehensive integration with Google Sheets, API, CSV/JSON data sources |
 
 ---
 

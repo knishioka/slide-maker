@@ -778,6 +778,384 @@ class ValidationService {
     
     return Math.max(0, baseScore - issueDeduction - recommendationDeduction);
   }
+
+  // 外部データソース統合のための新しいバリデーション機能
+
+  /**
+   * 外部データソース設定のバリデーション
+   * @param {Object} dataSourceConfig - データソース設定
+   * @returns {Object} バリデーション結果
+   */
+  validateDataSourceConfig(dataSourceConfig) {
+    const errors = [];
+    const warnings = [];
+
+    if (!dataSourceConfig || typeof dataSourceConfig !== 'object') {
+      errors.push('データソース設定が必要です');
+      return { isValid: false, errors, warnings };
+    }
+
+    // ソースタイプの検証
+    const validSourceTypes = ['google-sheets', 'api', 'csv', 'json'];
+    if (!dataSourceConfig.sourceType || !validSourceTypes.includes(dataSourceConfig.sourceType)) {
+      errors.push(`無効なソースタイプです。有効な値: ${validSourceTypes.join(', ')}`);
+    }
+
+    // Google Sheets特有の検証
+    if (dataSourceConfig.sourceType === 'google-sheets') {
+      if (!dataSourceConfig.spreadsheetId) {
+        errors.push('Google SheetsのスプレッドシートIDが必要です');
+      } else if (typeof dataSourceConfig.spreadsheetId !== 'string') {
+        errors.push('スプレッドシートIDは文字列である必要があります');
+      }
+
+      if (!dataSourceConfig.range) {
+        warnings.push('範囲が指定されていません。デフォルト範囲を使用します');
+      }
+    }
+
+    // API特有の検証
+    if (dataSourceConfig.sourceType === 'api') {
+      if (!dataSourceConfig.url) {
+        errors.push('API URLが必要です');
+      } else if (!this.isValidUrl(dataSourceConfig.url)) {
+        errors.push('無効なAPI URLです');
+      }
+
+      // HTTPSの推奨
+      if (dataSourceConfig.url && !dataSourceConfig.url.startsWith('https://')) {
+        warnings.push('セキュリティのためHTTPS URLの使用を推奨します');
+      }
+    }
+
+    // CSV特有の検証
+    if (dataSourceConfig.sourceType === 'csv') {
+      if (!dataSourceConfig.csvContent && !dataSourceConfig.csvUrl) {
+        errors.push('CSVコンテンツまたはCSV URLが必要です');
+      }
+
+      if (dataSourceConfig.csvUrl && !this.isValidUrl(dataSourceConfig.csvUrl)) {
+        errors.push('無効なCSV URLです');
+      }
+    }
+
+    // 共通のオプション検証
+    if (dataSourceConfig.options) {
+      if (dataSourceConfig.options.maxRows && 
+          (typeof dataSourceConfig.options.maxRows !== 'number' || dataSourceConfig.options.maxRows < 1)) {
+        warnings.push('最大行数は1以上の数値である必要があります');
+      }
+
+      if (dataSourceConfig.options.maxSize && 
+          (typeof dataSourceConfig.options.maxSize !== 'number' || dataSourceConfig.options.maxSize < 1024)) {
+        warnings.push('最大サイズは1024バイト以上である必要があります');
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+      sanitized: this.sanitizeDataSourceConfig(dataSourceConfig)
+    };
+  }
+
+  /**
+   * データ変換設定のバリデーション
+   * @param {Object} transformConfig - データ変換設定
+   * @returns {Object} バリデーション結果
+   */
+  validateDataTransformConfig(transformConfig) {
+    const errors = [];
+    const warnings = [];
+
+    if (!transformConfig || typeof transformConfig !== 'object') {
+      return { isValid: true, errors, warnings, sanitized: {} }; // オプショナル
+    }
+
+    // コンテンツタイプの検証
+    const validContentTypes = ['table', 'chart', 'text', 'list', 'card'];
+    if (transformConfig.contentType && !validContentTypes.includes(transformConfig.contentType)) {
+      errors.push(`無効なコンテンツタイプです。有効な値: ${validContentTypes.join(', ')}`);
+    }
+
+    // スキーマの検証
+    if (transformConfig.schema && typeof transformConfig.schema !== 'object') {
+      errors.push('スキーマはオブジェクトである必要があります');
+    }
+
+    // フィルタの検証
+    if (transformConfig.filter && typeof transformConfig.filter !== 'object') {
+      warnings.push('フィルタはオブジェクトである必要があります');
+    }
+
+    // ソート設定の検証
+    if (transformConfig.sort) {
+      if (typeof transformConfig.sort !== 'object') {
+        warnings.push('ソート設定はオブジェクトである必要があります');
+      } else if (transformConfig.sort.field && typeof transformConfig.sort.field !== 'string') {
+        warnings.push('ソートフィールドは文字列である必要があります');
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+      sanitized: this.sanitizeDataTransformConfig(transformConfig)
+    };
+  }
+
+  /**
+   * 外部データの内容検証
+   * @param {*} data - 検証対象データ
+   * @param {Object} options - 検証オプション
+   * @returns {Object} 検証結果
+   */
+  validateExternalData(data, options = {}) {
+    const errors = [];
+    const warnings = [];
+
+    if (data == null) {
+      errors.push('データが空またはnullです');
+      return { isValid: false, errors, warnings };
+    }
+
+    // データサイズチェック
+    const dataSize = this.calculateDataSize(data);
+    const maxSize = options.maxSize || 1024 * 1024; // 1MB default
+
+    if (dataSize > maxSize) {
+      errors.push(`データサイズが制限を超過しています: ${dataSize} > ${maxSize}`);
+    } else if (dataSize > maxSize * 0.8) {
+      warnings.push(`データサイズが大きいです: ${dataSize} bytes`);
+    }
+
+    // 配列データの検証
+    if (Array.isArray(data)) {
+      const maxRows = options.maxRows || 10000;
+      if (data.length > maxRows) {
+        errors.push(`行数が制限を超過しています: ${data.length} > ${maxRows}`);
+      }
+
+      // 各要素の型チェック
+      const dataTypes = new Set();
+      data.slice(0, 100).forEach((item, index) => { // 最初の100件のみチェック
+        dataTypes.add(typeof item);
+        if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+          const fieldCount = Object.keys(item).length;
+          if (fieldCount > 50) {
+            warnings.push(`行 ${index}: フィールド数が多すぎます (${fieldCount})`);
+          }
+        }
+      });
+
+      if (dataTypes.size > 1) {
+        warnings.push('データ型が混在しています。一貫性を確保してください');
+      }
+    }
+
+    // セキュリティチェック
+    const securityResult = this.performSecurityValidation(JSON.stringify(data), 'external-data');
+    if (!securityResult.isSecure) {
+      errors.push(...securityResult.issues);
+    }
+    warnings.push(...securityResult.warnings);
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+      metadata: {
+        dataSize,
+        recordCount: Array.isArray(data) ? data.length : 1,
+        dataTypes: Array.isArray(data) ? Array.from(new Set(data.map(item => typeof item))) : [typeof data],
+        securityThreatLevel: securityResult.threatLevel
+      }
+    };
+  }
+
+  /**
+   * APIレスポンスの検証
+   * @param {Object} response - APIレスポンス
+   * @param {Object} options - 検証オプション
+   * @returns {Object} 検証結果
+   */
+  validateApiResponse(response, options = {}) {
+    const errors = [];
+    const warnings = [];
+
+    if (!response) {
+      errors.push('APIレスポンスが空です');
+      return { isValid: false, errors, warnings };
+    }
+
+    // レスポンスサイズチェック
+    const responseSize = JSON.stringify(response).length;
+    const maxSize = options.maxResponseSize || 10 * 1024 * 1024; // 10MB
+
+    if (responseSize > maxSize) {
+      errors.push(`APIレスポンスサイズが制限を超過: ${responseSize} > ${maxSize}`);
+    }
+
+    // 一般的なAPIエラー構造のチェック
+    if (response.error || response.errors) {
+      warnings.push('APIレスポンスにエラー情報が含まれています');
+    }
+
+    // ステータスコードチェック（存在する場合）
+    if (response.status && typeof response.status === 'number') {
+      if (response.status >= 400) {
+        errors.push(`APIエラーステータス: ${response.status}`);
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+      metadata: {
+        responseSize,
+        hasErrorField: !!(response.error || response.errors),
+        topLevelFields: Object.keys(response)
+      }
+    };
+  }
+
+  /**
+   * データソース設定のサニタイズ
+   * @param {Object} config - 設定オブジェクト
+   * @returns {Object} サニタイズされた設定
+   */
+  sanitizeDataSourceConfig(config) {
+    const sanitized = {
+      sourceType: config.sourceType,
+      options: config.options || {}
+    };
+
+    if (config.sourceType === 'google-sheets') {
+      sanitized.spreadsheetId = this.sanitizeText(config.spreadsheetId || '');
+      sanitized.range = this.sanitizeText(config.range || 'A1:Z1000');
+    }
+
+    if (config.sourceType === 'api') {
+      sanitized.url = config.url;
+      if (config.headers) {
+        sanitized.headers = {};
+        Object.keys(config.headers).forEach(key => {
+          sanitized.headers[this.sanitizeText(key)] = this.sanitizeText(config.headers[key]);
+        });
+      }
+    }
+
+    if (config.sourceType === 'csv') {
+      if (config.csvContent) {
+        sanitized.csvContent = this.sanitizeText(config.csvContent);
+      }
+      if (config.csvUrl) {
+        sanitized.csvUrl = config.csvUrl;
+      }
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * データ変換設定のサニタイズ
+   * @param {Object} config - 変換設定
+   * @returns {Object} サニタイズされた設定
+   */
+  sanitizeDataTransformConfig(config) {
+    const sanitized = {};
+
+    if (config.contentType) {
+      sanitized.contentType = config.contentType;
+    }
+
+    if (config.schema && typeof config.schema === 'object') {
+      sanitized.schema = config.schema;
+    }
+
+    if (config.mapping && typeof config.mapping === 'object') {
+      sanitized.mapping = config.mapping;
+    }
+
+    if (config.filter && typeof config.filter === 'object') {
+      sanitized.filter = config.filter;
+    }
+
+    if (config.sort && typeof config.sort === 'object') {
+      sanitized.sort = config.sort;
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * データサイズの計算
+   * @param {*} data - データ
+   * @returns {number} バイト数
+   */
+  calculateDataSize(data) {
+    try {
+      return JSON.stringify(data).length;
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  /**
+   * 外部データソース接続の健全性チェック
+   * @param {Object} config - データソース設定
+   * @returns {Object} 健全性チェック結果
+   */
+  async validateDataSourceHealth(config) {
+    const checks = [];
+    let overallHealth = 'healthy';
+
+    try {
+      if (config.sourceType === 'api' && config.url) {
+        // API疎通確認（実際には実行しない、設定の妥当性のみチェック）
+        if (!this.isValidUrl(config.url)) {
+          checks.push({ type: 'connectivity', status: 'error', message: '無効なURL' });
+          overallHealth = 'error';
+        } else {
+          checks.push({ type: 'connectivity', status: 'ok', message: 'URL形式は有効' });
+        }
+      }
+
+      if (config.sourceType === 'google-sheets' && config.spreadsheetId) {
+        // スプレッドシートIDの形式チェック
+        const idPattern = /^[a-zA-Z0-9-_]{44}$/;
+        if (!idPattern.test(config.spreadsheetId)) {
+          checks.push({ type: 'authentication', status: 'warning', message: 'スプレッドシートIDの形式が疑わしい' });
+          if (overallHealth === 'healthy') overallHealth = 'warning';
+        } else {
+          checks.push({ type: 'authentication', status: 'ok', message: 'スプレッドシートID形式は有効' });
+        }
+      }
+
+      // 認証設定チェック
+      if (config.authToken) {
+        if (typeof config.authToken !== 'string' || config.authToken.length < 10) {
+          checks.push({ type: 'authentication', status: 'error', message: '認証トークンが無効' });
+          overallHealth = 'error';
+        } else {
+          checks.push({ type: 'authentication', status: 'ok', message: '認証トークンが設定済み' });
+        }
+      }
+
+    } catch (error) {
+      checks.push({ type: 'general', status: 'error', message: `健全性チェックエラー: ${error.message}` });
+      overallHealth = 'error';
+    }
+
+    return {
+      overallHealth,
+      checks,
+      timestamp: new Date().toISOString()
+    };
+  }
 }
 
 // Global export for Google Apps Script

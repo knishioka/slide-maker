@@ -9,6 +9,10 @@ class ContentService {
   constructor() {
     this.slidesService = new SlidesService();
     this.validationService = new ValidationService();
+    
+    // 外部データソース統合サービス
+    this.dataSourceService = null;
+    this.dataTransformService = null;
 
     this.defaultTheme = {
       fontFamily: 'Arial',
@@ -340,7 +344,12 @@ class ContentService {
       image: () => this.addImageElement(pId, sIdx, item, dims, layout, index),
       table: () => this.addTableElement(pId, sIdx, item, dims, theme, layout, index),
       mermaid: () => this.addMermaidElement(pId, sIdx, item, dims, layout, index),
-      svg: () => this.addSVGElement(pId, sIdx, item, dims, layout, index)
+      svg: () => this.addSVGElement(pId, sIdx, item, dims, layout, index),
+      // 外部データソース統合のための新しい要素タイプ
+      'external-data': () => this.addExternalDataElement(pId, sIdx, item, dims, theme, layout, index),
+      'google-sheets': () => this.addGoogleSheetsElement(pId, sIdx, item, dims, theme, layout, index),
+      'api-data': () => this.addApiDataElement(pId, sIdx, item, dims, theme, layout, index),
+      'csv-data': () => this.addCsvDataElement(pId, sIdx, item, dims, theme, layout, index)
     };
   }
 
@@ -740,6 +749,326 @@ class ContentService {
       slideIndex,
       elementsUpdated
     };
+  }
+
+  /**
+   * 外部データソースサービスを初期化
+   * @param {DataSourceService} dataSourceService - データソースサービス
+   * @param {DataTransformService} dataTransformService - データ変換サービス
+   */
+  initializeDataSourceServices(dataSourceService, dataTransformService) {
+    this.dataSourceService = dataSourceService;
+    this.dataTransformService = dataTransformService;
+    logger.info('外部データソースサービスが初期化されました');
+  }
+
+  /**
+   * 外部データ要素をスライドに追加
+   * @param {string} presentationId - プレゼンテーションID
+   * @param {number} slideIndex - スライドインデックス
+   * @param {Object} dataItem - データアイテム設定
+   * @param {Object} slideDimensions - スライド寸法
+   * @param {Object} theme - テーマ設定
+   * @param {string} layout - レイアウトタイプ
+   * @param {number} elementIndex - 要素位置インデックス
+   * @returns {Promise<Object>} 外部データ要素結果
+   */
+  async addExternalDataElement(
+    presentationId,
+    slideIndex,
+    dataItem,
+    slideDimensions,
+    theme,
+    layout,
+    elementIndex
+  ) {
+    if (!this.dataSourceService || !this.dataTransformService) {
+      throw new Error('データソースサービスが初期化されていません');
+    }
+
+    try {
+      logger.info('外部データ要素追加開始', { 
+        sourceType: dataItem.sourceType,
+        contentType: dataItem.contentType 
+      });
+
+      // データ取得
+      let rawData;
+      switch (dataItem.sourceType) {
+        case 'google-sheets':
+          rawData = await this.dataSourceService.fetchGoogleSheetsData(
+            dataItem.spreadsheetId,
+            dataItem.range,
+            dataItem.options
+          );
+          break;
+        case 'api':
+          rawData = await this.dataSourceService.fetchApiData(
+            dataItem.url,
+            dataItem.options
+          );
+          break;
+        case 'csv':
+          rawData = await this.dataSourceService.fetchCsvData(
+            dataItem.csvContent,
+            dataItem.options
+          );
+          break;
+        default:
+          throw new Error(`未対応のデータソースタイプ: ${dataItem.sourceType}`);
+      }
+
+      // データ変換
+      const transformedData = await this.dataTransformService.transformForSlideContent(
+        rawData,
+        dataItem.contentType,
+        dataItem.transformOptions
+      );
+
+      // スライドコンテンツとして追加
+      const contentElement = await this.addTransformedDataToSlide(
+        presentationId,
+        slideIndex,
+        transformedData,
+        slideDimensions,
+        theme,
+        layout,
+        elementIndex
+      );
+
+      logger.info('外部データ要素追加完了', { 
+        sourceType: dataItem.sourceType,
+        contentType: dataItem.contentType 
+      });
+
+      return {
+        type: 'external-data',
+        sourceType: dataItem.sourceType,
+        contentType: dataItem.contentType,
+        element: contentElement,
+        metadata: {
+          dataSize: Array.isArray(rawData) ? rawData.length : 1,
+          transformedType: transformedData.type
+        }
+      };
+
+    } catch (error) {
+      logger.error('外部データ要素追加エラー', { 
+        sourceType: dataItem.sourceType,
+        error: error.toString() 
+      });
+      throw new Error(`外部データ要素追加失敗: ${error.message}`);
+    }
+  }
+
+  /**
+   * Google Sheets 要素をスライドに追加
+   * @param {string} presentationId - プレゼンテーションID
+   * @param {number} slideIndex - スライドインデックス
+   * @param {Object} sheetsItem - Google Sheets アイテム設定
+   * @param {Object} slideDimensions - スライド寸法
+   * @param {Object} theme - テーマ設定
+   * @param {string} layout - レイアウトタイプ
+   * @param {number} elementIndex - 要素位置インデックス
+   * @returns {Promise<Object>} Google Sheets 要素結果
+   */
+  async addGoogleSheetsElement(
+    presentationId,
+    slideIndex,
+    sheetsItem,
+    slideDimensions,
+    theme,
+    layout,
+    elementIndex
+  ) {
+    return await this.addExternalDataElement(
+      presentationId,
+      slideIndex,
+      {
+        sourceType: 'google-sheets',
+        contentType: sheetsItem.contentType || 'table',
+        spreadsheetId: sheetsItem.spreadsheetId,
+        range: sheetsItem.range,
+        options: sheetsItem.options,
+        transformOptions: sheetsItem.transformOptions
+      },
+      slideDimensions,
+      theme,
+      layout,
+      elementIndex
+    );
+  }
+
+  /**
+   * API データ要素をスライドに追加
+   * @param {string} presentationId - プレゼンテーションID
+   * @param {number} slideIndex - スライドインデックス
+   * @param {Object} apiItem - API アイテム設定
+   * @param {Object} slideDimensions - スライド寸法
+   * @param {Object} theme - テーマ設定
+   * @param {string} layout - レイアウトタイプ
+   * @param {number} elementIndex - 要素位置インデックス
+   * @returns {Promise<Object>} API データ要素結果
+   */
+  async addApiDataElement(
+    presentationId,
+    slideIndex,
+    apiItem,
+    slideDimensions,
+    theme,
+    layout,
+    elementIndex
+  ) {
+    return await this.addExternalDataElement(
+      presentationId,
+      slideIndex,
+      {
+        sourceType: 'api',
+        contentType: apiItem.contentType || 'text',
+        url: apiItem.url,
+        options: apiItem.options,
+        transformOptions: apiItem.transformOptions
+      },
+      slideDimensions,
+      theme,
+      layout,
+      elementIndex
+    );
+  }
+
+  /**
+   * CSV データ要素をスライドに追加
+   * @param {string} presentationId - プレゼンテーションID
+   * @param {number} slideIndex - スライドインデックス
+   * @param {Object} csvItem - CSV アイテム設定
+   * @param {Object} slideDimensions - スライド寸法
+   * @param {Object} theme - テーマ設定
+   * @param {string} layout - レイアウトタイプ
+   * @param {number} elementIndex - 要素位置インデックス
+   * @returns {Promise<Object>} CSV データ要素結果
+   */
+  async addCsvDataElement(
+    presentationId,
+    slideIndex,
+    csvItem,
+    slideDimensions,
+    theme,
+    layout,
+    elementIndex
+  ) {
+    return await this.addExternalDataElement(
+      presentationId,
+      slideIndex,
+      {
+        sourceType: 'csv',
+        contentType: csvItem.contentType || 'table',
+        csvContent: csvItem.csvContent,
+        options: csvItem.options,
+        transformOptions: csvItem.transformOptions
+      },
+      slideDimensions,
+      theme,
+      layout,
+      elementIndex
+    );
+  }
+
+  /**
+   * 変換済みデータをスライドに追加
+   * @param {string} presentationId - プレゼンテーションID
+   * @param {number} slideIndex - スライドインデックス
+   * @param {Object} transformedData - 変換済みデータ
+   * @param {Object} slideDimensions - スライド寸法
+   * @param {Object} theme - テーマ設定
+   * @param {string} layout - レイアウトタイプ
+   * @param {number} elementIndex - 要素位置インデックス
+   * @returns {Promise<Object>} 追加された要素
+   */
+  async addTransformedDataToSlide(
+    presentationId,
+    slideIndex,
+    transformedData,
+    slideDimensions,
+    theme,
+    layout,
+    elementIndex
+  ) {
+    switch (transformedData.type) {
+      case 'table':
+        return await this.addTableElement(
+          presentationId,
+          slideIndex,
+          { data: transformedData.rows, headers: transformedData.headers },
+          slideDimensions,
+          theme,
+          layout,
+          elementIndex
+        );
+
+      case 'text':
+        return await this.addTextElement(
+          presentationId,
+          slideIndex,
+          { text: transformedData.content },
+          slideDimensions,
+          theme,
+          layout,
+          elementIndex
+        );
+
+      case 'list': {
+        // リストを文字列として表示
+        const listText = transformedData.items
+          .map(item => `• ${item.title}${item.description ? ': ' + item.description : ''}`)
+          .join('\n');
+        
+        return await this.addTextElement(
+          presentationId,
+          slideIndex,
+          { text: listText },
+          slideDimensions,
+          theme,
+          layout,
+          elementIndex
+        );
+      }
+
+      case 'card': {
+        // カード形式のテキスト表示
+        const cardText = `${transformedData.title}\n${transformedData.subtitle}\n${transformedData.value}`;
+        
+        return await this.addTextElement(
+          presentationId,
+          slideIndex,
+          { text: cardText, fontSize: theme.titleFontSize },
+          slideDimensions,
+          theme,
+          layout,
+          elementIndex
+        );
+      }
+
+      case 'chart': {
+        // チャートは今回はテーブルとして表示
+        const chartTableData = transformedData.labels.map((label, index) => [
+          label,
+          transformedData.data[index]
+        ]);
+        
+        return await this.addTableElement(
+          presentationId,
+          slideIndex,
+          { data: chartTableData, headers: ['ラベル', '値'] },
+          slideDimensions,
+          theme,
+          layout,
+          elementIndex
+        );
+      }
+
+      default:
+        throw new Error(`未対応の変換データタイプ: ${transformedData.type}`);
+    }
   }
 }
 
