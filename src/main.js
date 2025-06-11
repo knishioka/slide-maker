@@ -10,17 +10,17 @@
  */
 function initializeServices() {
   try {
-    logger.info('Initializing Slide Generator services');
+    Logger.info('Initializing Slide Generator services');
 
     // Test service initialization
     const _slidesService = new SlidesService();
     const _contentService = new ContentService();
     const _validationService = new ValidationService();
 
-    logger.info('All services initialized successfully');
+    Logger.info('All services initialized successfully');
     return true;
   } catch (error) {
-    logger.error('Failed to initialize services', null, error);
+    Logger.error('Failed to initialize services', null, error);
     return false;
   }
 }
@@ -31,16 +31,16 @@ function initializeServices() {
  * @returns {Object} Creation result with presentation ID and metadata
  */
 function createSlidePresentation(config) {
-  const monitor = logger.createPerformanceMonitor('createSlidePresentation');
+  const monitor = Logger.createPerformanceMonitor('createSlidePresentation');
   monitor.start();
 
   try {
-    logger.info('Creating slide presentation', { title: config.title });
+    Logger.info('Creating slide presentation', { title: config.title });
 
     const contentService = new ContentService();
     const result = contentService.createPresentation(config);
 
-    logger.info('Slide presentation created successfully', {
+    Logger.info('Slide presentation created successfully', {
       presentationId: result.presentationId,
       slideCount: result.slides.length
     });
@@ -50,7 +50,71 @@ function createSlidePresentation(config) {
       data: result
     };
   } catch (error) {
-    logger.error('Failed to create slide presentation', { config }, error);
+    Logger.error('Failed to create slide presentation', { config }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  } finally {
+    monitor.end();
+  }
+}
+
+/**
+ * Create presentation from content array (API compatible)
+ * @param {string} title - Presentation title
+ * @param {Array} slides - Array of slide content objects
+ * @param {Object} options - Additional options (theme, layout)
+ * @returns {Object} Creation result
+ */
+function createPresentationFromContent(title, slides = [], options = {}) {
+  const monitor = Logger.createPerformanceMonitor('createPresentationFromContent');
+  monitor.start();
+
+  try {
+    Logger.info('Creating presentation from content', { 
+      title, 
+      slideCount: slides.length,
+      layout: options.layout
+    });
+
+    // Validate input
+    const validation = ValidationService.validatePresentationData({
+      title,
+      slides,
+      theme: options.theme,
+      layout: options.layout
+    });
+
+    if (!validation.isValid) {
+      throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
+    }
+
+    // Create the presentation
+    const contentService = new ContentService();
+    const result = contentService.createPresentation({
+      title,
+      slides,
+      theme: options.theme,
+      layout: options.layout || 'single-column'
+    });
+
+    Logger.info('Presentation created from content successfully', {
+      presentationId: result.presentationId,
+      slideCount: result.slides.length
+    });
+
+    return {
+      success: true,
+      data: result
+    };
+  } catch (error) {
+    Logger.error('Failed to create presentation from content', { 
+      title, 
+      slides: slides.length,
+      options 
+    }, error);
     return {
       success: false,
       error: error.message,
@@ -69,12 +133,12 @@ function createSlidePresentation(config) {
  */
 function addSlideToPresentation(presentationId, slideConfig) {
   try {
-    logger.info('Adding slide to presentation', { presentationId, type: slideConfig.type });
+    Logger.info('Adding slide to presentation', { presentationId, type: slideConfig.type });
 
     const contentService = new ContentService();
     const result = contentService.addSlideWithContent(presentationId, slideConfig);
 
-    logger.info('Slide added successfully', {
+    Logger.info('Slide added successfully', {
       presentationId,
       slideIndex: result.slideIndex
     });
@@ -84,7 +148,7 @@ function addSlideToPresentation(presentationId, slideConfig) {
       data: result
     };
   } catch (error) {
-    logger.error('Failed to add slide', { presentationId, slideConfig }, error);
+    Logger.error('Failed to add slide', { presentationId, slideConfig }, error);
     return {
       success: false,
       error: error.message,
@@ -101,12 +165,12 @@ function addSlideToPresentation(presentationId, slideConfig) {
  */
 function applyPresentationTheme(presentationId, theme) {
   try {
-    logger.info('Applying theme to presentation', { presentationId });
+    Logger.info('Applying theme to presentation', { presentationId });
 
     const contentService = new ContentService();
     const result = contentService.applyTheme(presentationId, theme);
 
-    logger.info('Theme applied successfully', {
+    Logger.info('Theme applied successfully', {
       presentationId,
       slidesProcessed: result.slidesProcessed
     });
@@ -116,7 +180,7 @@ function applyPresentationTheme(presentationId, theme) {
       data: result
     };
   } catch (error) {
-    logger.error('Failed to apply theme', { presentationId, theme }, error);
+    Logger.error('Failed to apply theme', { presentationId, theme }, error);
     return {
       success: false,
       error: error.message,
@@ -135,7 +199,7 @@ function validateSlideContent(content) {
     const validationService = new ValidationService();
     const result = validationService.validateSlideContent(content);
 
-    logger.debug('Content validation completed', {
+    Logger.debug('Content validation completed', {
       isValid: result.isValid,
       errorCount: result.errors.length,
       warningCount: result.warnings.length
@@ -146,7 +210,7 @@ function validateSlideContent(content) {
       data: result
     };
   } catch (error) {
-    logger.error('Content validation failed', { content }, error);
+    Logger.error('Content validation failed', { content }, error);
     return {
       success: false,
       error: error.message,
@@ -162,7 +226,7 @@ function validateSlideContent(content) {
  */
 function getPresentationInfo(presentationId) {
   try {
-    logger.debug('Getting presentation info', { presentationId });
+    Logger.debug('Getting presentation info', { presentationId });
 
     const slidesService = new SlidesService();
     const result = slidesService.getPresentationInfo(presentationId);
@@ -172,7 +236,7 @@ function getPresentationInfo(presentationId) {
       data: result
     };
   } catch (error) {
-    logger.error('Failed to get presentation info', { presentationId }, error);
+    Logger.error('Failed to get presentation info', { presentationId }, error);
     return {
       success: false,
       error: error.message,
@@ -198,7 +262,7 @@ function _processSingleSlide(contentService, presentationId, slideConfig, index)
       data: slideResult
     };
   } catch (slideError) {
-    logger.warn(
+    Logger.warn(
       'Failed to create slide in batch',
       {
         index: index,
@@ -222,11 +286,11 @@ function _processSingleSlide(contentService, presentationId, slideConfig, index)
  * @returns {Object} Batch creation result
  */
 function batchCreateSlides(presentationId, slidesConfig) {
-  const monitor = logger.createPerformanceMonitor('batchCreateSlides');
+  const monitor = Logger.createPerformanceMonitor('batchCreateSlides');
   monitor.start();
 
   try {
-    logger.info('Starting batch slide creation', {
+    Logger.info('Starting batch slide creation', {
       presentationId,
       slideCount: slidesConfig.length
     });
@@ -242,7 +306,7 @@ function batchCreateSlides(presentationId, slidesConfig) {
     const successCount = results.filter(r => r.success).length;
     const failureCount = results.length - successCount;
 
-    logger.info('Batch slide creation completed', {
+    Logger.info('Batch slide creation completed', {
       presentationId,
       total: results.length,
       successful: successCount,
@@ -262,7 +326,7 @@ function batchCreateSlides(presentationId, slidesConfig) {
       }
     };
   } catch (error) {
-    logger.error('Batch slide creation failed', { presentationId, slidesConfig }, error);
+    Logger.error('Batch slide creation failed', { presentationId, slidesConfig }, error);
     return {
       success: false,
       error: error.message,
@@ -281,7 +345,7 @@ function batchCreateSlides(presentationId, slidesConfig) {
  */
 function generateMermaidSlides(presentationId, mermaidCodes) {
   try {
-    logger.info('Generating Mermaid slides', {
+    Logger.info('Generating Mermaid slides', {
       presentationId,
       diagramCount: mermaidCodes.length
     });
@@ -299,7 +363,7 @@ function generateMermaidSlides(presentationId, mermaidCodes) {
 
     return batchCreateSlides(presentationId, slidesConfig);
   } catch (error) {
-    logger.error('Failed to generate Mermaid slides', { presentationId, mermaidCodes }, error);
+    Logger.error('Failed to generate Mermaid slides', { presentationId, mermaidCodes }, error);
     return {
       success: false,
       error: error.message,
@@ -317,7 +381,7 @@ function generateMermaidSlides(presentationId, mermaidCodes) {
  */
 function convertTextToSlides(presentationId, textBlocks, options = {}) {
   try {
-    logger.info('Converting text to slides', {
+    Logger.info('Converting text to slides', {
       presentationId,
       textBlockCount: textBlocks.length
     });
@@ -345,7 +409,7 @@ function convertTextToSlides(presentationId, textBlocks, options = {}) {
 
     return batchCreateSlides(presentationId, slidesConfig);
   } catch (error) {
-    logger.error('Failed to convert text to slides', { presentationId, textBlocks }, error);
+    Logger.error('Failed to convert text to slides', { presentationId, textBlocks }, error);
     return {
       success: false,
       error: error.message,
@@ -360,7 +424,7 @@ function convertTextToSlides(presentationId, textBlocks, options = {}) {
  */
 function getSystemHealth() {
   try {
-    const logs = logger.getRecentLogs(10);
+    const logs = Logger.getRecentLogs(10);
     const errorCount = logs.filter(log => log.level === 'ERROR').length;
     const warningCount = logs.filter(log => log.level === 'WARN').length;
 
@@ -372,11 +436,11 @@ function getSystemHealth() {
         recentLogs: logs.length,
         recentErrors: errorCount,
         recentWarnings: warningCount,
-        logLevel: logger.getCurrentLevel()
+        logLevel: Logger.getCurrentLevel()
       }
     };
   } catch (error) {
-    logger.error('Failed to get system health', null, error);
+    Logger.error('Failed to get system health', null, error);
     return {
       success: false,
       error: error.message,
@@ -392,15 +456,15 @@ function getSystemHealth() {
  */
 function setLogLevel(level) {
   try {
-    logger.setLevel(level);
-    logger.info('Log level changed', { newLevel: level });
+    Logger.setLevel(level);
+    Logger.info('Log level changed', { newLevel: level });
 
     return {
       success: true,
-      data: { level: logger.getCurrentLevel() }
+      data: { level: Logger.getCurrentLevel() }
     };
   } catch (error) {
-    logger.error('Failed to set log level', { level }, error);
+    Logger.error('Failed to set log level', { level }, error);
     return {
       success: false,
       error: error.message,

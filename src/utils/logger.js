@@ -112,6 +112,303 @@ class Logger {
   }
 
   /**
+   * Enhanced error handling for API operations
+   * @param {Error} error - Error object
+   * @param {Object} context - Error context information
+   * @returns {Object} Standardized error response
+   */
+  handleApiError(error, context = {}) {
+    const errorId = Utilities.getUuid();
+    const timestamp = new Date().toISOString();
+    
+    // Classify error severity
+    const severity = this.classifyErrorSeverity(error);
+    
+    // Create detailed error report
+    const errorReport = {
+      id: errorId,
+      timestamp,
+      severity,
+      message: error.message,
+      stack: error.stack,
+      context,
+      userMessage: this.generateUserFriendlyMessage(error, severity)
+    };
+
+    // Log with appropriate level based on severity
+    if (severity === 'high') {
+      this.error('High severity API error', errorReport, error);
+    } else if (severity === 'medium') {
+      this.warn('Medium severity API error', errorReport);
+    } else {
+      this.info('Low severity API error', errorReport);
+    }
+
+    return {
+      success: false,
+      error: {
+        id: errorId,
+        message: errorReport.userMessage,
+        timestamp,
+        severity
+      }
+    };
+  }
+
+  /**
+   * Classify error severity based on error type and message
+   * @param {Error} error - Error object
+   * @returns {string} Severity level (high, medium, low)
+   */
+  classifyErrorSeverity(error) {
+    const message = error.message.toLowerCase();
+    
+    // High severity: System/service failures
+    if (message.includes('quota') || 
+        message.includes('permission') ||
+        message.includes('unauthorized') ||
+        message.includes('forbidden') ||
+        message.includes('service unavailable')) {
+      return 'high';
+    }
+    
+    // Medium severity: Request/network issues
+    if (message.includes('timeout') ||
+        message.includes('network') ||
+        message.includes('connection') ||
+        error.name === 'TypeError' ||
+        error.name === 'ReferenceError') {
+      return 'medium';
+    }
+    
+    // Low severity: Validation/user input issues
+    return 'low';
+  }
+
+  /**
+   * Generate user-friendly error message
+   * @param {Error} error - Error object
+   * @param {string} severity - Error severity
+   * @returns {string} User-friendly message
+   */
+  generateUserFriendlyMessage(error, severity) {
+    const message = error.message.toLowerCase();
+    
+    // High severity errors
+    if (severity === 'high') {
+      if (message.includes('quota')) {
+        return 'Service quota exceeded. Please try again later or contact support.';
+      }
+      if (message.includes('permission') || message.includes('unauthorized')) {
+        return 'Authentication required. Please check your API credentials.';
+      }
+      if (message.includes('forbidden')) {
+        return 'Access denied. Insufficient permissions for this operation.';
+      }
+      return 'A system error occurred. Please try again later or contact support.';
+    }
+    
+    // Medium severity errors
+    if (severity === 'medium') {
+      if (message.includes('timeout')) {
+        return 'Request timed out. Please try again with a smaller request.';
+      }
+      if (message.includes('network') || message.includes('connection')) {
+        return 'Network error occurred. Please check your connection and try again.';
+      }
+      return 'A temporary error occurred. Please try again.';
+    }
+    
+    // Low severity errors (validation issues)
+    if (message.includes('validation') || message.includes('invalid')) {
+      return 'Invalid input provided. Please check your request data.';
+    }
+    
+    return 'Request could not be processed. Please check your input and try again.';
+  }
+
+  /**
+   * Track API operation metrics
+   * @param {string} operation - Operation name
+   * @param {number} duration - Operation duration in ms
+   * @param {boolean} success - Whether operation succeeded
+   * @param {Object} metadata - Additional metadata
+   */
+  trackApiMetrics(operation, duration, success, metadata = {}) {
+    const metricsData = {
+      operation,
+      duration,
+      success,
+      timestamp: new Date().toISOString(),
+      ...metadata
+    };
+
+    this.info('API operation metrics', metricsData);
+
+    // Log slow operations
+    if (duration > 5000) { // 5 seconds
+      this.warn('Slow API operation detected', {
+        operation,
+        duration: `${duration}ms`,
+        threshold: '5000ms'
+      });
+    }
+
+    // Log high failure rate
+    if (!success && metadata.retryCount > 2) {
+      this.error('High retry count for API operation', {
+        operation,
+        retryCount: metadata.retryCount,
+        lastError: metadata.lastError
+      });
+    }
+  }
+
+  /**
+   * Create circuit breaker for API operations
+   * @param {string} serviceName - Name of the service
+   * @param {number} failureThreshold - Number of failures before circuit opens
+   * @param {number} timeoutMs - Timeout before trying again
+   * @returns {Object} Circuit breaker instance
+   */
+  createCircuitBreaker(serviceName, failureThreshold = 5, timeoutMs = 60000) {
+    const circuitState = {
+      failures: 0,
+      lastFailure: null,
+      state: 'closed' // closed, open, half-open
+    };
+
+    return {
+      execute: (operation) => {
+        const now = Date.now();
+        
+        // Check if circuit should be half-open
+        if (circuitState.state === 'open' && 
+            now - circuitState.lastFailure > timeoutMs) {
+          circuitState.state = 'half-open';
+          this.info('Circuit breaker half-open', { serviceName });
+        }
+
+        // Reject if circuit is open
+        if (circuitState.state === 'open') {
+          const error = new Error(`Circuit breaker open for ${serviceName}`);
+          this.warn('Circuit breaker rejected operation', { 
+            serviceName, 
+            failures: circuitState.failures 
+          });
+          throw error;
+        }
+
+        try {
+          const result = operation();
+          
+          // Reset on success
+          if (circuitState.failures > 0) {
+            this.info('Circuit breaker reset', { serviceName });
+            circuitState.failures = 0;
+            circuitState.state = 'closed';
+          }
+          
+          return result;
+        } catch (error) {
+          circuitState.failures++;
+          circuitState.lastFailure = now;
+          
+          this.error('Circuit breaker recorded failure', {
+            serviceName,
+            failures: circuitState.failures,
+            threshold: failureThreshold
+          }, error);
+
+          // Open circuit if threshold reached
+          if (circuitState.failures >= failureThreshold) {
+            circuitState.state = 'open';
+            this.error('Circuit breaker opened', { 
+              serviceName, 
+              failures: circuitState.failures 
+            });
+          }
+          
+          throw error;
+        }
+      },
+      
+      getState: () => ({ ...circuitState }),
+      reset: () => {
+        circuitState.failures = 0;
+        circuitState.state = 'closed';
+        circuitState.lastFailure = null;
+        this.info('Circuit breaker manually reset', { serviceName });
+      }
+    };
+  }
+
+  /**
+   * Retry operation with exponential backoff
+   * @param {Function} operation - Operation to retry
+   * @param {number} maxRetries - Maximum retry attempts
+   * @param {number} baseDelay - Base delay in ms
+   * @param {string} operationName - Name for logging
+   * @returns {*} Operation result
+   */
+  retryWithBackoff(operation, maxRetries = 3, baseDelay = 1000, operationName = 'operation') {
+    return new Promise((resolve, reject) => {
+      let attempt = 0;
+
+      const executeAttempt = () => {
+        attempt++;
+        
+        try {
+          const result = operation();
+          
+          // Handle both sync and async operations
+          if (result && typeof result.then === 'function') {
+            result
+              .then(resolve)
+              .catch(handleError);
+          } else {
+            resolve(result);
+          }
+        } catch (error) {
+          handleError(error);
+        }
+      };
+
+      const handleError = (error) => {
+        this.warn(`Retry attempt ${attempt} failed for ${operationName}`, {
+          attempt,
+          maxRetries,
+          error: error.message
+        });
+
+        if (attempt >= maxRetries) {
+          this.error(`All retry attempts exhausted for ${operationName}`, {
+            attempts: attempt,
+            finalError: error.message
+          }, error);
+          reject(error);
+          return;
+        }
+
+        // Calculate exponential backoff delay
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        const jitter = Math.random() * 0.1 * delay; // Add 10% jitter
+        const finalDelay = delay + jitter;
+
+        this.debug(`Retrying ${operationName} in ${finalDelay}ms`, {
+          attempt: attempt + 1,
+          delay: finalDelay
+        });
+
+        Utilities.sleep(finalDelay);
+        executeAttempt();
+      };
+
+      executeAttempt();
+    });
+  }
+
+  /**
    * Performance timing utility
    * @param {string} operation - Operation name
    * @param {Function} fn - Function to time
