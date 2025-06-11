@@ -9,6 +9,7 @@ class ContentService {
   constructor() {
     this.slidesService = new SlidesService();
     this.validationService = new ValidationService();
+    this.mermaidService = new MermaidService();
 
     this.defaultTheme = {
       fontFamily: 'Arial',
@@ -495,7 +496,7 @@ class ContentService {
   }
 
   /**
-   * Add Mermaid diagram element to slide
+   * Add Mermaid diagram element to slide with advanced features
    * @param {string} presentationId - Presentation ID
    * @param {number} slideIndex - Slide index
    * @param {Object} mermaidItem - Mermaid item configuration
@@ -505,6 +506,102 @@ class ContentService {
    * @returns {Promise<Object>} Mermaid element result
    */
   async addMermaidElement(
+    presentationId,
+    slideIndex,
+    mermaidItem,
+    slideDimensions,
+    layout,
+    elementIndex
+  ) {
+    try {
+      logger.debug('Adding advanced Mermaid element', { 
+        presentationId, 
+        slideIndex, 
+        interactive: mermaidItem.interactive,
+        exportFormats: mermaidItem.exportFormats 
+      });
+
+      const position =
+        mermaidItem.position ||
+        this.calculateContentPosition(slideDimensions, layout, elementIndex, 'diagram');
+
+      // Use advanced MermaidService for diagram creation
+      const diagramOptions = {
+        code: mermaidItem.code,
+        styleTemplate: mermaidItem.styleTemplate || 'professional',
+        customTheme: mermaidItem.customTheme,
+        interactive: mermaidItem.interactive || false,
+        interactiveOptions: mermaidItem.interactiveOptions || {},
+        exportFormats: mermaidItem.exportFormats || ['svg'],
+        width: position.width,
+        height: position.height,
+        clickHandlers: mermaidItem.clickHandlers,
+        tooltipData: mermaidItem.tooltipData,
+        animations: mermaidItem.animations
+      };
+
+      const diagramResult = await this.mermaidService.createAdvancedDiagram(diagramOptions);
+
+      // Insert the primary SVG into the slide
+      const svgContent = diagramResult.outputs.interactive || diagramResult.outputs.svg;
+      const _image = this.slidesService.insertSVG(presentationId, slideIndex, svgContent, position);
+
+      // Store additional outputs for potential export
+      const result = {
+        type: 'mermaid',
+        code: diagramResult.code,
+        position,
+        config: diagramResult.config,
+        metadata: diagramResult.metadata,
+        outputs: diagramResult.outputs,
+        features: {
+          interactive: Boolean(mermaidItem.interactive),
+          multiFormat: diagramResult.outputs ? 
+            Object.keys(diagramResult.outputs).length > 1 : false,
+          customStyling: Boolean(mermaidItem.styleTemplate) || 
+            Boolean(mermaidItem.customTheme)
+        }
+      };
+
+      logger.info('Advanced Mermaid element added successfully', {
+        presentationId,
+        slideIndex,
+        features: result.features,
+        complexity: result.metadata.complexity
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to add advanced Mermaid element', { 
+        presentationId, 
+        slideIndex, 
+        mermaidItem 
+      }, error);
+      
+      // Fallback to basic Mermaid generation
+      logger.warn('Falling back to basic Mermaid generation');
+      return await this.addBasicMermaidElement(
+        presentationId, 
+        slideIndex, 
+        mermaidItem, 
+        slideDimensions, 
+        layout, 
+        elementIndex
+      );
+    }
+  }
+
+  /**
+   * Fallback method for basic Mermaid diagram creation
+   * @param {string} presentationId - Presentation ID
+   * @param {number} slideIndex - Slide index
+   * @param {Object} mermaidItem - Mermaid item configuration
+   * @param {Object} slideDimensions - Slide dimensions
+   * @param {string} layout - Layout type
+   * @param {number} elementIndex - Element position index
+   * @returns {Promise<Object>} Basic Mermaid element result
+   */
+  async addBasicMermaidElement(
     presentationId,
     slideIndex,
     mermaidItem,
@@ -527,7 +624,8 @@ class ContentService {
     return {
       type: 'mermaid',
       code: validation.sanitized,
-      position
+      position,
+      fallback: true
     };
   }
 
@@ -740,6 +838,183 @@ class ContentService {
       slideIndex,
       elementsUpdated
     };
+  }
+
+  /**
+   * Export Mermaid diagram in multiple formats
+   * @param {string} presentationId - Presentation ID
+   * @param {number} slideIndex - Slide index
+   * @param {Object} exportOptions - Export configuration
+   * @returns {Promise<Object>} Export result with multiple formats
+   */
+  async exportMermaidDiagram(presentationId, slideIndex, exportOptions) {
+    try {
+      logger.info('Exporting Mermaid diagram', { 
+        presentationId, 
+        slideIndex, 
+        formats: exportOptions.formats 
+      });
+
+      // Find the Mermaid element in the slide
+      const presentation = this.slidesService.openPresentation(presentationId);
+      const _slide = presentation.getSlides()[slideIndex];
+      
+      // For this implementation, we'll need to recreate the diagram with export options
+      if (!exportOptions.mermaidCode) {
+        throw new Error('Mermaid code is required for export');
+      }
+
+      const diagramOptions = {
+        code: exportOptions.mermaidCode,
+        styleTemplate: exportOptions.styleTemplate || 'professional',
+        customTheme: exportOptions.customTheme,
+        exportFormats: exportOptions.formats || ['svg', 'png', 'pdf'],
+        width: exportOptions.width || 800,
+        height: exportOptions.height || 600,
+        interactive: false // Disable for export
+      };
+
+      const diagramResult = await this.mermaidService.createAdvancedDiagram(diagramOptions);
+
+      // Prepare export results
+      const exportResult = {
+        presentationId,
+        slideIndex,
+        timestamp: new Date().toISOString(),
+        formats: {},
+        metadata: diagramResult.metadata
+      };
+
+      // Process each requested format
+      for (const format of exportOptions.formats) {
+        if (diagramResult.outputs[format]) {
+          exportResult.formats[format] = {
+            content: diagramResult.outputs[format],
+            mimeType: this.getMimeTypeForFormat(format),
+            filename: `mermaid-diagram-${slideIndex}.${format}`,
+            size: this.calculateContentSize(diagramResult.outputs[format])
+          };
+        }
+      }
+
+      logger.info('Mermaid diagram export completed', {
+        presentationId,
+        slideIndex,
+        exportedFormats: Object.keys(exportResult.formats)
+      });
+
+      return exportResult;
+    } catch (error) {
+      logger.error('Failed to export Mermaid diagram', { 
+        presentationId, 
+        slideIndex, 
+        exportOptions 
+      }, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get MIME type for export format
+   * @param {string} format - Export format
+   * @returns {string} MIME type
+   */
+  getMimeTypeForFormat(format) {
+    const mimeTypes = {
+      svg: 'image/svg+xml',
+      png: 'image/png',
+      jpeg: 'image/jpeg',
+      jpg: 'image/jpeg',
+      pdf: 'application/pdf'
+    };
+
+    return mimeTypes[format.toLowerCase()] || 'application/octet-stream';
+  }
+
+  /**
+   * Calculate content size
+   * @param {string|Blob} content - Content to measure
+   * @returns {number} Size in bytes
+   */
+  calculateContentSize(content) {
+    if (typeof content === 'string') {
+      return content.length;
+    } else if (content && content.getBytes) {
+      return content.getBytes().length;
+    }
+    return 0;
+  }
+
+  /**
+   * Batch export multiple Mermaid diagrams from presentation
+   * @param {string} presentationId - Presentation ID
+   * @param {Object} batchOptions - Batch export configuration
+   * @returns {Promise<Object>} Batch export result
+   */
+  async batchExportMermaidDiagrams(presentationId, batchOptions) {
+    try {
+      logger.info('Starting batch export of Mermaid diagrams', { 
+        presentationId, 
+        formats: batchOptions.formats 
+      });
+
+      const presentation = this.slidesService.openPresentation(presentationId);
+      const slides = presentation.getSlides();
+      const results = [];
+
+      for (let i = 0; i < slides.length; i++) {
+        try {
+          // Check if slide contains Mermaid diagrams
+          if (batchOptions.slideIndices && !batchOptions.slideIndices.includes(i)) {
+            continue;
+          }
+
+          // This would need additional logic to detect existing Mermaid diagrams
+          // For now, skip slides without explicit Mermaid code provided
+          if (batchOptions.slideMermaidCodes && batchOptions.slideMermaidCodes[i]) {
+            const exportOptions = {
+              mermaidCode: batchOptions.slideMermaidCodes[i],
+              formats: batchOptions.formats,
+              styleTemplate: batchOptions.styleTemplate,
+              customTheme: batchOptions.customTheme,
+              width: batchOptions.width,
+              height: batchOptions.height
+            };
+
+            const slideResult = await this.exportMermaidDiagram(presentationId, i, exportOptions);
+            results.push(slideResult);
+          }
+        } catch (error) {
+          logger.warn(`Failed to export Mermaid diagram from slide ${i}`, error);
+          results.push({
+            slideIndex: i,
+            error: error.message,
+            success: false
+          });
+        }
+      }
+
+      const batchResult = {
+        presentationId,
+        timestamp: new Date().toISOString(),
+        totalSlides: slides.length,
+        processedSlides: results.length,
+        successfulExports: results.filter(r => !r.error).length,
+        failedExports: results.filter(r => r.error).length,
+        results
+      };
+
+      logger.info('Batch export completed', {
+        presentationId,
+        successful: batchResult.successfulExports,
+        failed: batchResult.failedExports
+      });
+
+      return batchResult;
+    } catch (error) {
+      logger.error('Batch export failed', { presentationId, batchOptions }, error);
+      throw error;
+    }
   }
 }
 
