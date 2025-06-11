@@ -178,29 +178,139 @@ function executeWithRetry(fn, maxRetries = 3) {
 }
 ```
 
-## Git Worktree 分散開発戦略
-### 基本原則
-- **機能単位の分離**: 新機能・修正は必ず専用worktreeで開発
-- **並行開発対応**: 複数機能を同時に開発可能
-- **クリーンな環境**: 各worktreeは独立した作業環境
+## Git Worktree 分散開発戦略 & タスク管理システム
 
-### Worktree管理コマンド
+### 📋 中央タスク管理システム
+- **管理ドキュメント**: `TASKS.md` - すべてのタスクの中央ハブ
+- **状態管理**: TODO → IN_PROGRESS → DONE の明確な流れ
+- **依存関係**: タスク間の依存関係を可視化
+- **担当者管理**: 各タスクの担当者とworktreeブランチを記録
+
+### 🎯 タスク状態とルール
+
+#### タスク状態
+- **📝 TODO**: 未着手（誰でもアサイン可能）
+- **🚧 IN_PROGRESS**: 作業中（担当者・worktreeブランチ必須）
+- **⏸️ BLOCKED**: 依存関係で待機中
+- **✅ DONE**: 完了・mainにマージ済み
+- **❌ CANCELLED**: キャンセル・不要になったタスク
+
+#### タスク管理ルール
+1. **タスク開始前**: TASKS.mdでタスクをIN_PROGRESSに変更し、担当者・worktreeブランチを記載
+2. **作業中**: 専用worktreeで独立開発
+3. **完了時**: 必ずTASKS.mdでDONEに変更後、worktree削除
+4. **ブロック時**: BLOCKEDに変更し、理由を明記
+
+### 🔄 統合ワークフロー
+
+#### 新タスク開始フロー
 ```bash
-# 利用可能なスクリプト
-./scripts/setup-worktrees.sh      # 初回セットアップ
-./scripts/manage-worktrees.sh     # worktree管理
+# 1. TASKS.mdでタスク状態更新
+# - ステータス: TODO → IN_PROGRESS
+# - 担当者: [Your Name]
+# - Worktree: feature/task-xxx-description
+# - 開始日: YYYY-MM-DD
 
-# 手動操作
-git worktree list                 # worktree一覧
-git worktree add -b feat-x ../feat-x  # 新規作成
-git worktree remove ../feat-x     # 削除
+# 2. 専用worktree作成
+git worktree add -b feature/task-001-layout-engine ../task-001-layout-engine
+cd ../task-001-layout-engine
+
+# 3. 開発開始
+# - 既存パターン踏襲
+# - 定期的なテスト実行
+# - コミット前lint実行
 ```
 
-### 開発ワークフロー
-1. **開始**: `git worktree add -b feature-name ../feature-name`
-2. **開発**: worktree内で通常の開発作業
-3. **テスト**: 各worktreeで独立してテスト実行
-4. **完了**: mainにマージ後 `git worktree remove`
+#### タスク完了フロー
+```bash
+# 1. 品質保証
+npm run lint && npm run test && npm run build
+
+# 2. mainにマージ
+cd /path/to/main
+git checkout main
+git merge feature/task-001-layout-engine
+
+# 3. TASKS.md更新
+# - ステータス: IN_PROGRESS → DONE
+# - 完了日: YYYY-MM-DD
+# - 成果物: 実装した機能の概要
+
+# 4. worktree削除
+git worktree remove ../task-001-layout-engine
+git branch -d feature/task-001-layout-engine
+```
+
+### 🏗️ 並行開発支援
+
+#### 複数開発者対応
+- **タスクの可視化**: 誰が何をやっているかTASKS.mdで即座に確認
+- **競合回避**: ファイル単位の影響範囲をタスク説明に記載
+- **ブロッカー管理**: 依存関係が明確で待機理由が分かる
+
+#### Worktree命名規則
+```bash
+# パターン: feature/task-[番号]-[短縮説明]
+feature/task-001-layout-engine
+feature/task-005-api-development
+feature/task-007-web-dashboard
+hotfix/bug-123-memory-leak
+```
+
+### 📊 進捗監視とレポート
+
+#### 日次チェック
+```bash
+# アクティブなタスク確認
+grep "IN_PROGRESS" TASKS.md
+
+# 完了タスク数確認
+grep "DONE" TASKS.md | wc -l
+
+# ブロッカー確認
+grep "BLOCKED" TASKS.md
+
+# worktree状況確認
+git worktree list
+```
+
+#### 週次レビュー
+- **完了タスク**: 今週DONEになったタスクの確認
+- **進行中タスク**: 予定通り進んでいるかの確認
+- **ブロッカー解消**: 待機中タスクの依存関係解決
+- **次週計画**: 新たにアサインするタスクの決定
+
+### 🛠️ 自動化サポート
+
+#### タスク管理スクリプト
+```bash
+# 新タスク開始
+./scripts/start-task.sh TASK-001
+
+# タスク完了
+./scripts/complete-task.sh TASK-001
+
+# 進捗確認
+./scripts/check-progress.sh
+```
+
+#### 品質チェック自動化
+- **pre-commit hooks**: lint + test自動実行
+- **CI/CD**: プルリクエスト時の自動テスト
+- **定期チェック**: 日次でTASKS.mdの整合性確認
+
+### 🔧 トラブルシューティング
+
+#### よくある問題と解決
+- **worktree削除エラー**: `git worktree remove --force`
+- **ブランチ削除エラー**: マージ確認後 `git branch -D`
+- **タスク状態の不整合**: TASKS.mdの手動修正
+- **依存関係の循環**: タスク分割で解決
+
+#### エスカレーション
+- **ブロッカー長期化**: チーム全体で優先度見直し
+- **技術的困難**: アーキテクチャレビューの実施
+- **リソース不足**: タスクの再優先付けまたは延期
 
 ## 開発時注意事項
 

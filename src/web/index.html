@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Slides Content Generator</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="app-title">
+                    <span class="material-icons">slideshow</span>
+                    Google Slides Generator
+                </h1>
+                <div class="header-actions">
+                    <button id="healthCheck" class="btn btn-outline">
+                        <span class="material-icons">health_and_safety</span>
+                        システム状態
+                    </button>
+                    <button id="historyToggle" class="btn btn-outline">
+                        <span class="material-icons">history</span>
+                        履歴
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <nav class="sidebar-nav">
+                    <button class="nav-item active" data-section="create">
+                        <span class="material-icons">add_circle</span>
+                        新規作成
+                    </button>
+                    <button class="nav-item" data-section="templates">
+                        <span class="material-icons">design_services</span>
+                        テンプレート
+                    </button>
+                    <button class="nav-item" data-section="batch">
+                        <span class="material-icons">batch_prediction</span>
+                        一括作成
+                    </button>
+                    <button class="nav-item" data-section="mermaid">
+                        <span class="material-icons">account_tree</span>
+                        Mermaid図
+                    </button>
+                </nav>
+            </aside>
+
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Create Section -->
+                <section id="create-section" class="content-section active">
+                    <div class="section-header">
+                        <h2>新しいプレゼンテーション作成</h2>
+                        <p>スライドを作成してGoogle Slidesで開きます</p>
+                    </div>
+
+                    <form id="createForm" class="create-form">
+                        <!-- Basic Info -->
+                        <div class="form-group">
+                            <label for="presentationTitle">プレゼンテーションタイトル</label>
+                            <input type="text" id="presentationTitle" name="title" required
+                                   placeholder="例: Q4 Business Review" class="form-input">
+                        </div>
+
+                        <!-- Template Selection -->
+                        <div class="form-group">
+                            <label>テンプレート選択</label>
+                            <div id="templateGrid" class="template-grid">
+                                <!-- Templates will be populated by JavaScript -->
+                            </div>
+                        </div>
+
+                        <!-- Slides Configuration -->
+                        <div class="form-group">
+                            <label>スライド設定</label>
+                            <div class="slides-config">
+                                <div id="slidesList" class="slides-list">
+                                    <!-- Slides will be added here dynamically -->
+                                </div>
+                                <button type="button" id="addSlide" class="btn btn-outline">
+                                    <span class="material-icons">add</span>
+                                    スライド追加
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="form-actions">
+                            <button type="button" id="previewBtn" class="btn btn-outline">
+                                <span class="material-icons">preview</span>
+                                プレビュー
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <span class="material-icons">create</span>
+                                プレゼンテーション作成
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- Templates Section -->
+                <section id="templates-section" class="content-section">
+                    <div class="section-header">
+                        <h2>テンプレート一覧</h2>
+                        <p>用途に応じてテンプレートを選択してください</p>
+                    </div>
+                    <div id="templatesGrid" class="templates-grid">
+                        <!-- Templates will be populated here -->
+                    </div>
+                </section>
+
+                <!-- Batch Section -->
+                <section id="batch-section" class="content-section">
+                    <div class="section-header">
+                        <h2>一括スライド作成</h2>
+                        <p>複数のスライドを一度に作成できます</p>
+                    </div>
+                    <div class="batch-form">
+                        <div class="form-group">
+                            <label for="batchTitle">プレゼンテーションタイトル</label>
+                            <input type="text" id="batchTitle" placeholder="例: Technical Documentation" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="batchContent">テキストコンテンツ (1行1スライド)</label>
+                            <textarea id="batchContent" rows="10" placeholder="スライド1のタイトル | スライド1の内容&#10;スライド2のタイトル | スライド2の内容" class="form-textarea"></textarea>
+                        </div>
+                        <button type="button" id="batchCreate" class="btn btn-primary">
+                            <span class="material-icons">batch_prediction</span>
+                            一括作成
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Mermaid Section -->
+                <section id="mermaid-section" class="content-section">
+                    <div class="section-header">
+                        <h2>Mermaid図作成</h2>
+                        <p>Mermaidコードから図を生成してスライドに追加</p>
+                    </div>
+                    <div class="mermaid-form">
+                        <div class="form-group">
+                            <label>Mermaidサンプル</label>
+                            <div id="mermaidExamples" class="mermaid-examples">
+                                <!-- Examples will be populated here -->
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="mermaidCode">Mermaidコード</label>
+                            <textarea id="mermaidCode" rows="10" placeholder="graph TD&#10;    A[Start] --> B{Decision}&#10;    B -->|Yes| C[Process A]&#10;    B -->|No| D[Process B]" class="form-textarea"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="mermaidTitle">スライドタイトル</label>
+                            <input type="text" id="mermaidTitle" placeholder="例: System Architecture" class="form-input">
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="mermaidPreview" class="btn btn-outline">
+                                <span class="material-icons">visibility</span>
+                                プレビュー
+                            </button>
+                            <button type="button" id="mermaidCreate" class="btn btn-primary">
+                                <span class="material-icons">account_tree</span>
+                                スライド作成
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- Preview Modal -->
+        <div id="previewModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>プレビュー</h3>
+                    <button class="modal-close" onclick="closePreview()">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="previewContent" class="preview-content">
+                        <!-- Preview content will be populated here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="closePreview()" class="btn btn-outline">閉じる</button>
+                    <button onclick="createFromPreview()" class="btn btn-primary">この内容で作成</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Panel -->
+        <div id="historyPanel" class="history-panel">
+            <div class="panel-header">
+                <h3>作成履歴</h3>
+                <button onclick="toggleHistory()" class="panel-close">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div class="panel-body">
+                <div id="historyList" class="history-list">
+                    <!-- History items will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <p>処理中...</p>
+            </div>
+        </div>
+
+        <!-- Notification -->
+        <div id="notification" class="notification">
+            <div class="notification-content">
+                <span class="notification-icon material-icons"></span>
+                <span class="notification-message"></span>
+                <button class="notification-close" onclick="hideNotification()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="mock-data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
