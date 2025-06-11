@@ -105,8 +105,25 @@ start_task() {
     ./scripts/task-start.sh "$task_id" "quick-dev" "$(git config user.name || echo 'Developer')"
     
     echo ""
-    echo -e "${GREEN}🎉 Task $task_id started! You are now in the worktree directory.${NC}"
-    echo -e "${CYAN}Start coding immediately!${NC}"
+    echo -e "${GREEN}🎉 Task $task_id started!${NC}"
+    
+    # sourceで実行された場合は自動でディレクトリ移動
+    if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+        # sourceで実行された場合
+        task_number=$(echo "$task_id" | sed 's/TASK-//')
+        worktree_path=$(find .. -maxdepth 1 -name "task-${task_number}-*" -type d 2>/dev/null | head -1)
+        if [ -n "$worktree_path" ] && [ -d "$worktree_path" ]; then
+            cd "$worktree_path"
+            echo -e "${CYAN}📁 Auto-moved to: $(pwd)${NC}"
+            echo -e "${CYAN}🚀 Start coding immediately!${NC}"
+        else
+            echo -e "${YELLOW}⚠️  Could not find worktree directory for auto-move${NC}"
+            echo -e "${CYAN}💡 You are now in the worktree directory. Start coding!${NC}"
+        fi
+    else
+        echo -e "${CYAN}💡 To auto-move to worktree, use: source ./scripts/quick-start.sh${NC}"
+        echo -e "${CYAN}🚀 Start coding immediately!${NC}"
+    fi
 }
 
 # メイン処理

@@ -241,9 +241,13 @@ if [[ $cleanup_response =~ ^[Yy]$ ]]; then
     fi
     
     echo -e "${GREEN}✅ Worktree cleanup completed${NC}"
+    echo -e "${CYAN}📁 Automatically moved to: $MAIN_DIR${NC}"
 else
     echo -e "${BLUE}ℹ️  Worktree preserved: $WORKTREE_PATH${NC}"
     echo "Clean up manually with: git worktree remove $WORKTREE_PATH"
+    echo ""
+    echo -e "${CYAN}📁 Moving to main directory: $MAIN_DIR${NC}"
+    cd "$MAIN_DIR"
 fi
 
 # 完了サマリー

@@ -45,18 +45,23 @@ Slidesコンテンツ自動生成サービス。ダブルカラム・シング�
 
 ### 1. 開発フロー（Git Worktree活用）
 
-1. **機能別worktree作成**: 新機能開発時は必ずgit worktreeで分離
-   ```bash
-   # 新機能開発用worktree作成
-   git worktree add -b feature-name ../feature-name
-   cd ../feature-name
-   ```
-2. **調査フェーズ**: まずTaskツールで関連ファイル・機能を調査
-3. **計画**: TodoWriteツールで作業を細分化・管理
-4. **実装**: 既存コードパターンに従って開発
-5. **テスト**: 実装後即座にテスト実行
-6. **Lint**: コミット前に必ずlint実行
-7. **マージ**: 完了後mainブランチにマージしworktree削除
+**🚀 簡単タスク開始（推奨）**:
+```bash
+# エイリアス設定（初回のみ）
+./scripts/setup-aliases.sh
+
+# タスク開始（自動でworktreeディレクトリに移動）
+slides-start              # インタラクティブ選択
+# または
+source ./scripts/quick-start.sh TASK-XXX  # 直接指定
+```
+
+**📝 開発プロセス**:
+1. **調査フェーズ**: Taskツールで関連ファイル・機能を調査
+2. **計画**: TodoWriteツールで作業を細分化・管理
+3. **実装**: 既存コードパターンに従って開発
+4. **品質チェック**: `slides-build` または `npm run lint && npm run test`
+5. **完了**: `task-done TASK-XXX` で自動マージ・クリーンアップ・mainに移動
 
 ### 2. ファイル操作の制約
 
