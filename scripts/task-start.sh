@@ -65,9 +65,11 @@ if ! grep -q "\[$TASK_ID\]" TASKS.md; then
 fi
 
 # Worktree設定
-WORKTREE_NAME="feature/task-${TASK_ID,,}-${TASK_NAME}"  # 小文字に変換
+TASK_ID_LOWER=$(echo "$TASK_ID" | tr '[:upper:]' '[:lower:]')
+TASK_NAME_CLEAN=$(echo "$TASK_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
+WORKTREE_NAME="feature/${TASK_ID_LOWER}-${TASK_NAME_CLEAN}"
 TASK_NUMBER=$(echo "$TASK_ID" | sed 's/TASK-//')
-WORKTREE_PATH="../task-${TASK_NUMBER}-${TASK_NAME}"
+WORKTREE_PATH="../task-${TASK_NUMBER}-${TASK_NAME_CLEAN}"
 
 echo -e "${BLUE}🚀 Starting task: $TASK_ID${NC}"
 echo -e "📝 Task name: $TASK_NAME"
@@ -119,64 +121,85 @@ git config user.name >/dev/null 2>&1 || {
     fi
 }
 
-# 作業完了メッセージ
-echo ""
-echo -e "${GREEN}✅ Worktree created successfully!${NC}"
-echo ""
-
-# 次のステップガイド
-show_next_steps() {
-    echo -e "${BLUE}📝 Next steps:${NC}"
-    echo ""
-    echo "1. 📋 Update TASKS.md:"
-    echo "   - Change status from 📝 TODO to 🚧 IN_PROGRESS"
-    echo "   - Add assignee: ${ASSIGNEE:-'[Your Name]'}"
-    echo "   - Add worktree: $WORKTREE_NAME"
-    echo "   - Add start date: $(date '+%Y-%m-%d')"
-    echo ""
-    echo "2. 💻 Start development:"
-    echo "   cd $WORKTREE_PATH"
-    echo "   # Your development work here..."
-    echo ""
-    echo "3. 🧪 Regular quality checks:"
-    echo "   npm run lint"
-    echo "   npm run test"
-    echo ""
-    echo "4. 📝 Commit your work:"
-    echo "   git add ."
-    echo "   git commit -m \"feat: implement [feature description]\""
-    echo ""
-    echo "5. ✅ Complete the task:"
-    echo "   ../main/scripts/complete-task.sh $TASK_ID"
-    echo ""
-    echo -e "${YELLOW}💡 Remember to keep TASKS.md updated with your progress!${NC}"
-    echo ""
-    echo -e "${PURPLE}🔗 Useful commands:${NC}"
-    echo "   git worktree list                    # List all worktrees"
-    echo "   ../main/scripts/check-progress.sh   # Check project progress"
-    echo "   ../main/scripts/manage-worktrees.sh status  # Detailed status"
+# TASKS.md自動更新
+echo -e "${BLUE}📝 Updating TASKS.md automatically...${NC}"
+update_tasks_md() {
+    local main_dir="../main"
+    local tasks_file="$main_dir/TASKS.md"
+    local start_date=$(date '+%Y-%m-%d')
+    
+    if [ -f "$tasks_file" ]; then
+        # TODO → IN_PROGRESS に変更
+        if grep -q "📝.*\*\*\[$TASK_ID\]" "$tasks_file"; then
+            # 一時ファイルで更新
+            sed "s/📝\(.*\*\*\[$TASK_ID\]\)/🚧\1/" "$tasks_file" > "$tasks_file.tmp"
+            
+            # Assignee, Worktree, Start date を更新/追加
+            awk -v task_id="$TASK_ID" -v assignee="${ASSIGNEE:-'Developer'}" -v worktree="$WORKTREE_NAME" -v start_date="$start_date" '
+            /\*\*\[/ && $0 ~ task_id {
+                in_task = 1
+                print $0
+                next
+            }
+            in_task && /- \*\*Assignee\*\*:/ {
+                print "  - **Assignee**: " assignee
+                next
+            }
+            in_task && /- \*\*Worktree\*\*:/ {
+                print "  - **Worktree**: " worktree
+                next
+            }
+            in_task && /- \*\*Started\*\*:/ {
+                print "  - **Started**: " start_date
+                next
+            }
+            in_task && /^$/ && !assignee_added {
+                print "  - **Assignee**: " assignee
+                print "  - **Worktree**: " worktree
+                print "  - **Started**: " start_date
+                print $0
+                assignee_added = 1
+                in_task = 0
+                next
+            }
+            in_task && /^\*\*\[/ {
+                if (!assignee_added) {
+                    print "  - **Assignee**: " assignee
+                    print "  - **Worktree**: " worktree  
+                    print "  - **Started**: " start_date
+                    print ""
+                }
+                in_task = 0
+                assignee_added = 0
+                print $0
+                next
+            }
+            { print $0 }
+            ' "$tasks_file.tmp" > "$tasks_file.tmp2"
+            
+            mv "$tasks_file.tmp2" "$tasks_file"
+            rm -f "$tasks_file.tmp"
+            
+            echo -e "${GREEN}✅ TASKS.md updated successfully${NC}"
+        else
+            echo -e "${YELLOW}⚠️  Task $TASK_ID not found in TASKS.md${NC}"
+        fi
+    else
+        echo -e "${RED}❌ TASKS.md not found${NC}"
+    fi
 }
 
-show_next_steps
-
-# TASKS.md更新の確認
-echo ""
-read -p "Open TASKS.md for editing now? (y/N): " open_tasks
-if [[ $open_tasks =~ ^[Yy]$ ]]; then
-    # 利用可能なエディタを検出
-    if command -v code >/dev/null 2>&1; then
-        echo -e "${BLUE}📝 Opening TASKS.md in VS Code...${NC}"
-        cd "../main"
-        code TASKS.md
-    elif command -v vim >/dev/null 2>&1; then
-        echo -e "${BLUE}📝 Opening TASKS.md in vim...${NC}"
-        cd "../main"
-        vim TASKS.md
-    else
-        echo -e "${YELLOW}⚠️  No suitable editor found. Please manually edit:${NC}"
-        echo "   ../main/TASKS.md"
-    fi
-fi
+update_tasks_md
 
 echo ""
-echo -e "${GREEN}🎉 Task $TASK_ID is ready for development!${NC}"
+echo -e "${GREEN}✅ Worktree created and task started!${NC}"
+echo ""
+echo -e "${CYAN}📂 You are now in: $(pwd)${NC}"
+echo -e "${CYAN}🌿 Branch: $(git branch --show-current)${NC}"
+echo ""
+echo -e "${BLUE}🚀 Ready to start development!${NC}"
+echo ""
+echo -e "${YELLOW}Quick commands:${NC}"
+echo "  npm run lint && npm run test   # Quality checks"
+echo "  git add . && git commit        # Commit changes"
+echo "  ../main/scripts/task-complete.sh $TASK_ID  # Complete task"

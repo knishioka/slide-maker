@@ -214,20 +214,13 @@ echo "  2. Add completion date: $(date '+%Y-%m-%d')"
 echo "  3. Add deliverables description"
 echo ""
 
-# TASKS.md自動更新の提案
-read -p "Open TASKS.md for editing? (y/N): " edit_tasks
-if [[ $edit_tasks =~ ^[Yy]$ ]]; then
-    if command -v code >/dev/null 2>&1; then
-        echo -e "${BLUE}📝 Opening TASKS.md in VS Code...${NC}"
-        code "$MAIN_DIR/TASKS.md"
-    elif command -v vim >/dev/null 2>&1; then
-        echo -e "${BLUE}📝 Opening TASKS.md in vim...${NC}"
-        vim "$MAIN_DIR/TASKS.md"
-    else
-        echo -e "${YELLOW}⚠️  No suitable editor found${NC}"
-        echo "Please manually edit: $MAIN_DIR/TASKS.md"
-    fi
-fi
+# TASKS.md更新の確認
+echo -e "${BLUE}📝 Please manually edit TASKS.md:${NC}"
+echo "   $MAIN_DIR/TASKS.md"
+echo ""
+echo -e "${YELLOW}Required updates:${NC}"
+echo "   - Status: 🚧 IN_PROGRESS → ✅ DONE"
+echo "   - Completion date: $(date '+%Y-%m-%d')"
 
 # worktreeクリーンアップ
 echo ""
