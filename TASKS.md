@@ -42,14 +42,15 @@
   - **Worktree**: -
   - **Status**: TODO
 
-- [ ] 📝 **[TASK-002]** Theme Management System
+- [ ] 🚧 **[TASK-002]** Theme Management System
   - **Priority**: High
   - **Estimate**: 3 days
   - **Dependencies**: Layout Engine
   - **Description**: Custom themes, color palettes, font management
-  - **Assignee**: -
-  - **Worktree**: -
-  - **Status**: TODO
+  - **Assignee**: Claude AI
+  - **Worktree**: feature/task-002-theme-system
+  - **Status**: IN_PROGRESS
+  - **Started**: 2025-01-11
 
 #### 🎨 Content Enhancement
 - [ ] 📝 **[TASK-003]** Advanced Mermaid Integration
@@ -71,14 +72,15 @@
   - **Status**: TODO
 
 #### 🔌 API & Integration
-- [ ] 📝 **[TASK-005]** RESTful API Development
+- [ ] 🚧 **[TASK-005]** RESTful API Development
   - **Priority**: High
   - **Estimate**: 7 days
   - **Dependencies**: Core Services
   - **Description**: HTTP endpoints, authentication, rate limiting
-  - **Assignee**: -
-  - **Worktree**: -
-  - **Status**: TODO
+  - **Assignee**: Claude AI
+  - **Worktree**: feature/task-005-api-development
+  - **Status**: IN_PROGRESS
+  - **Started**: 2025-01-11
 
 - [ ] 📝 **[TASK-006]** External Data Sources Integration
   - **Priority**: Medium

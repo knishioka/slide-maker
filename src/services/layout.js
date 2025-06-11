@@ -9,6 +9,11 @@ class LayoutService {
   constructor(slidesService) {
     this.slidesService = slidesService;
     this.designSystem = this.initializeDesignSystem();
+    
+    // Initialize advanced layout components
+    this.gridSystem = new GridSystem();
+    this.responsiveEngine = new ResponsiveEngine();
+    this.layoutTemplates = new LayoutTemplates();
   }
 
   /**
@@ -74,12 +79,14 @@ class LayoutService {
         }
       },
 
-      // Layout patterns
+      // Layout patterns (legacy - enhanced with new template system)
       layouts: {
         'single-column': { columns: 1, description: 'Single column layout' },
         'double-column': { columns: 2, description: 'Two column layout' },
         'title-content': { rows: [1, 4], description: 'Title and content layout' },
-        'three-column': { columns: 3, description: 'Three column layout' }
+        'three-column': { columns: 3, description: 'Three column layout' },
+        'custom-grid': { type: 'template', description: 'Template-based advanced layout' },
+        'responsive-grid': { type: 'responsive', description: 'Responsive grid layout' }
       }
     };
   }
@@ -95,29 +102,42 @@ class LayoutService {
       layoutType = 'single-column',
       theme = 'default',
       content = [],
-      slideIndex = 0
+      slideIndex = 0,
+      template = null,
+      responsive = true,
+      customAreas = null
     } = config;
 
     try {
       const slideDimensions = this.slidesService.getSlideDimensions(presentationId);
-      const grid = this.createGridSystem(slideDimensions, layoutType);
       const themeConfig = this.designSystem.themes[theme];
 
-      const layoutResult = this.renderLayout(
-        presentationId,
-        slideIndex,
-        layoutType,
-        content,
-        grid,
-        themeConfig
-      );
+      // Enhanced layout creation with new capabilities
+      let layoutResult;
+      
+      if (template) {
+        // Use template-based layout
+        layoutResult = this.createTemplateLayout(presentationId, slideIndex, template, content, slideDimensions, themeConfig, responsive);
+      } else if (layoutType === 'custom-grid' || customAreas) {
+        // Use custom grid layout
+        layoutResult = this.createCustomGridLayout(presentationId, slideIndex, customAreas, content, slideDimensions, themeConfig, responsive);
+      } else if (layoutType === 'responsive-grid') {
+        // Use responsive grid layout
+        layoutResult = this.createResponsiveGridLayout(presentationId, slideIndex, content, slideDimensions, themeConfig);
+      } else {
+        // Use legacy layout system for backward compatibility
+        const grid = this.createGridSystem(slideDimensions, layoutType);
+        layoutResult = this.renderLayout(presentationId, slideIndex, layoutType, content, grid, themeConfig);
+      }
 
       return {
         success: true,
         layoutType,
         theme,
+        template,
         elementsCreated: layoutResult.elements.length,
         slideDimensions,
+        responsive: layoutResult.responsive || false,
         elements: layoutResult.elements
       };
 
@@ -628,6 +648,360 @@ class LayoutService {
   }
 
   /**
+   * Create template-based layout
+   * @param {string} presentationId - Presentation ID
+   * @param {number} slideIndex - Slide index
+   * @param {string} templateName - Template name
+   * @param {Array} content - Content items
+   * @param {Object} slideDimensions - Slide dimensions
+   * @param {Object} theme - Theme configuration
+   * @param {boolean} responsive - Enable responsive behavior
+   * @returns {Object} Layout result
+   */
+  createTemplateLayout(presentationId, slideIndex, templateName, content, slideDimensions, theme, responsive) {
+    const templateConfig = this.layoutTemplates.createLayoutConfig(templateName, {
+      theme: theme.name || 'default',
+      content: content.map(item => item.type || 'body')
+    });
+
+    const gridConfig = {
+      slideDimensions,
+      areas: templateConfig.areas,
+      columns: 12,
+      gap: this.designSystem.spacing.sizes.md
+    };
+
+    let finalConfig = gridConfig;
+    if (responsive) {
+      const responsiveLayout = this.responsiveEngine.createResponsiveLayout(gridConfig, slideDimensions);
+      finalConfig = responsiveLayout.adaptedConfig;
+    }
+
+    const grid = this.gridSystem.createAdvancedGrid(finalConfig);
+    const elements = this.renderTemplateContent(presentationId, slideIndex, templateConfig.content, grid, theme);
+
+    return {
+      elements,
+      template: templateName,
+      responsive: responsive,
+      grid: finalConfig
+    };
+  }
+
+  /**
+   * Create custom grid layout
+   * @param {string} presentationId - Presentation ID
+   * @param {number} slideIndex - Slide index
+   * @param {Object} customAreas - Custom grid areas
+   * @param {Array} content - Content items
+   * @param {Object} slideDimensions - Slide dimensions
+   * @param {Object} theme - Theme configuration
+   * @param {boolean} responsive - Enable responsive behavior
+   * @returns {Object} Layout result
+   */
+  createCustomGridLayout(presentationId, slideIndex, customAreas, content, slideDimensions, theme, responsive) {
+    const gridConfig = {
+      slideDimensions,
+      areas: customAreas,
+      columns: 12,
+      gap: this.designSystem.spacing.sizes.md
+    };
+
+    let finalConfig = gridConfig;
+    if (responsive) {
+      const responsiveLayout = this.responsiveEngine.createResponsiveLayout(gridConfig, slideDimensions);
+      finalConfig = responsiveLayout.adaptedConfig;
+    }
+
+    const grid = this.gridSystem.createAdvancedGrid(finalConfig);
+    const elements = this.renderGridContent(presentationId, slideIndex, content, customAreas, grid, theme);
+
+    return {
+      elements,
+      responsive: responsive,
+      grid: finalConfig
+    };
+  }
+
+  /**
+   * Create responsive grid layout
+   * @param {string} presentationId - Presentation ID
+   * @param {number} slideIndex - Slide index
+   * @param {Array} content - Content items
+   * @param {Object} slideDimensions - Slide dimensions
+   * @param {Object} theme - Theme configuration
+   * @returns {Object} Layout result
+   */
+  createResponsiveGridLayout(presentationId, slideIndex, content, slideDimensions, theme) {
+    const breakpoint = this.responsiveEngine.getCurrentBreakpoint(slideDimensions.width, slideDimensions.height);
+    const responsiveConfig = this.responsiveEngine.getResponsiveConfig(breakpoint.key);
+
+    // Generate optimal layout based on content count and breakpoint
+    const optimalColumns = Math.min(responsiveConfig.columns, Math.ceil(Math.sqrt(content.length)));
+    const gridConfig = {
+      slideDimensions,
+      columns: optimalColumns,
+      gap: this.designSystem.spacing.sizes.md * responsiveConfig.spacing
+    };
+
+    const grid = this.gridSystem.createAdvancedGrid(gridConfig);
+    const elements = this.renderResponsiveContent(presentationId, slideIndex, content, grid, theme, responsiveConfig);
+
+    return {
+      elements,
+      responsive: true,
+      breakpoint: breakpoint.key,
+      grid: gridConfig
+    };
+  }
+
+  /**
+   * Render template content with advanced positioning
+   * @param {string} presentationId - Presentation ID
+   * @param {number} slideIndex - Slide index
+   * @param {Array} templateContent - Template content with area assignments
+   * @param {Object} grid - Advanced grid system
+   * @param {Object} theme - Theme configuration
+   * @returns {Array} Created elements
+   */
+  renderTemplateContent(presentationId, slideIndex, templateContent, grid, theme) {
+    const elements = [];
+
+    templateContent.forEach(item => {
+      if (item.area && grid.gridAreas[item.area]) {
+        const position = grid.getGridPosition(grid.gridAreas[item.area]);
+        const element = this.createAdvancedContentElement(
+          presentationId,
+          slideIndex,
+          item,
+          position,
+          theme,
+          grid
+        );
+        elements.push(element);
+      }
+    });
+
+    return elements;
+  }
+
+  /**
+   * Render custom grid content
+   * @param {string} presentationId - Presentation ID
+   * @param {number} slideIndex - Slide index
+   * @param {Array} content - Content items
+   * @param {Object} areas - Grid areas
+   * @param {Object} grid - Advanced grid system
+   * @param {Object} theme - Theme configuration
+   * @returns {Array} Created elements
+   */
+  renderGridContent(presentationId, slideIndex, content, areas, grid, theme) {
+    const elements = [];
+    const areaNames = Object.keys(areas);
+
+    content.forEach((item, index) => {
+      const areaName = areaNames[index];
+      if (areaName && grid.gridAreas[areaName]) {
+        const position = grid.getGridPosition(grid.gridAreas[areaName]);
+        const element = this.createAdvancedContentElement(
+          presentationId,
+          slideIndex,
+          { ...item, area: areaName },
+          position,
+          theme,
+          grid
+        );
+        elements.push(element);
+      }
+    });
+
+    return elements;
+  }
+
+  /**
+   * Render responsive content with adaptive sizing
+   * @param {string} presentationId - Presentation ID
+   * @param {number} slideIndex - Slide index
+   * @param {Array} content - Content items
+   * @param {Object} grid - Advanced grid system
+   * @param {Object} theme - Theme configuration
+   * @param {Object} responsiveConfig - Responsive configuration
+   * @returns {Array} Created elements
+   */
+  renderResponsiveContent(presentationId, slideIndex, content, grid, theme, responsiveConfig) {
+    const elements = [];
+    const itemsPerRow = grid.columns;
+    const rows = Math.ceil(content.length / itemsPerRow);
+
+    content.forEach((item, index) => {
+      const col = (index % itemsPerRow) + 1;
+      const row = Math.floor(index / itemsPerRow) + 1;
+
+      const position = {
+        x: grid.margins.left + ((col - 1) * (grid.columnWidth + grid.gap)),
+        y: grid.margins.top + ((row - 1) * (grid.contentHeight / rows)),
+        width: grid.columnWidth,
+        height: (grid.contentHeight / rows) - grid.gap
+      };
+
+      const element = this.createAdvancedContentElement(
+        presentationId,
+        slideIndex,
+        { ...item, responsive: true },
+        position,
+        theme,
+        grid,
+        responsiveConfig
+      );
+      elements.push(element);
+    });
+
+    return elements;
+  }
+
+  /**
+   * Create advanced content element with enhanced features
+   * @param {string} presentationId - Presentation ID
+   * @param {number} slideIndex - Slide index
+   * @param {Object} item - Content item
+   * @param {Object} position - Element position
+   * @param {Object} theme - Theme configuration
+   * @param {Object} grid - Grid system
+   * @param {Object} responsiveConfig - Optional responsive configuration
+   * @returns {Object} Created element information
+   */
+  createAdvancedContentElement(presentationId, slideIndex, item, position, theme, grid, responsiveConfig = null) {
+    const {
+      type = 'body',
+      text = '',
+      importance = 'medium',
+      area = null,
+      responsive = false
+    } = item;
+
+    // Enhanced font size calculation
+    let fontSize = this.calculateResponsiveFontSize({
+      baseSize: this.designSystem.fonts[type].default,
+      slideWidth: grid.width,
+      slideHeight: grid.height,
+      contentLength: text.length,
+      importance
+    });
+
+    // Apply responsive scaling if available
+    if (responsive && responsiveConfig) {
+      fontSize *= responsiveConfig.fontSize;
+    }
+
+    // Enhanced text style with area-specific adjustments
+    const textStyle = {
+      fontFamily: this.selectOptimalFont(type),
+      fontSize: fontSize,
+      color: this.getAreaSpecificColor(area, theme),
+      lineHeight: this.calculateLineHeight(fontSize, type),
+      bold: ['title', 'heading'].includes(type),
+      alignment: this.getAreaSpecificAlignment(area, type)
+    };
+
+    // Insert text box using SlidesService
+    const textBox = this.slidesService.insertTextBox(
+      presentationId,
+      slideIndex,
+      text,
+      position,
+      textStyle
+    );
+
+    return {
+      id: textBox.getObjectId(),
+      type,
+      text,
+      area,
+      position,
+      style: textStyle,
+      fontSize,
+      responsive
+    };
+  }
+
+  /**
+   * Get area-specific color based on layout context
+   * @param {string} area - Grid area name
+   * @param {Object} theme - Theme configuration
+   * @returns {string} Color value
+   */
+  getAreaSpecificColor(area, theme) {
+    if (!area) return theme.text;
+
+    const specialAreas = {
+      'header': theme.primary,
+      'sidebar': theme.textSecondary,
+      'footer': theme.textSecondary,
+      'title': theme.text,
+      'hero': theme.primary
+    };
+
+    return specialAreas[area] || theme.text;
+  }
+
+  /**
+   * Get area-specific text alignment
+   * @param {string} area - Grid area name
+   * @param {string} type - Content type
+   * @returns {string} Alignment value
+   */
+  getAreaSpecificAlignment(area, type) {
+    if (type === 'title' || area === 'header' || area === 'hero') {
+      return 'center';
+    }
+    if (area === 'sidebar') {
+      return 'left';
+    }
+    return 'left';
+  }
+
+  /**
+   * Get available layout templates
+   * @returns {Array} Available templates
+   */
+  getAvailableTemplates() {
+    return this.layoutTemplates.getCategories().map(category => ({
+      category: category.name,
+      templates: this.layoutTemplates.getTemplatesByCategory(category.id)
+    }));
+  }
+
+  /**
+   * Get layout recommendations based on content
+   * @param {Object} requirements - Content requirements
+   * @returns {Array} Recommended layouts
+   */
+  getLayoutRecommendations(requirements) {
+    return this.layoutTemplates.getRecommendations(requirements);
+  }
+
+  /**
+   * Generate layout preview
+   * @param {string} layoutType - Layout type or template name
+   * @returns {Object} Preview configuration
+   */
+  generateLayoutPreview(layoutType) {
+    if (this.layoutTemplates.getTemplate) {
+      try {
+        return this.layoutTemplates.generatePreview(layoutType);
+      } catch (error) {
+        // Fall back to legacy layout if template not found
+      }
+    }
+    
+    return {
+      layoutType,
+      preview: true,
+      areas: this.designSystem.layouts[layoutType] || {}
+    };
+  }
+
+  /**
    * Get design system information
    * @returns {Object} Design system summary
    */
@@ -637,7 +1011,10 @@ class LayoutService {
       layouts: Object.keys(this.designSystem.layouts),
       themes: Object.keys(this.designSystem.themes),
       spacingBase: this.designSystem.spacing.base,
-      colorPalette: Object.keys(this.designSystem.colors)
+      colorPalette: Object.keys(this.designSystem.colors),
+      templates: this.layoutTemplates ? Object.keys(this.layoutTemplates.templates) : [],
+      responsive: true,
+      gridSystem: true
     };
   }
 }

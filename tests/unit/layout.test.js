@@ -1,15 +1,79 @@
 /**
  * LayoutService Unit Tests
- * Comprehensive testing for layout management and responsive design
+ * Comprehensive testing for advanced layout management, responsive design, and grid systems
  */
 
 const { MockSlidesService, MockLogger } = require('../fixtures/core-services-mock');
 
-// Mock LayoutService for testing
+// Mock GridSystem
+class MockGridSystem {
+  createAdvancedGrid(config) {
+    return {
+      width: config.slideDimensions.width,
+      height: config.slideDimensions.height,
+      columns: config.columns || 12,
+      gap: config.gap || 16,
+      gridAreas: config.areas || {},
+      getGridPosition: (area) => ({ x: 50, y: 50, width: 400, height: 100 }),
+      margins: { top: 32, right: 42, bottom: 32, left: 42 }
+    };
+  }
+}
+
+// Mock ResponsiveEngine
+class MockResponsiveEngine {
+  getCurrentBreakpoint(width, height) {
+    if (width <= 768) return { key: 'sm', columns: 1, fontSize: 0.8 };
+    if (width <= 1024) return { key: 'md', columns: 2, fontSize: 0.9 };
+    return { key: 'lg', columns: 3, fontSize: 1.0 };
+  }
+
+  createResponsiveLayout(config, dimensions) {
+    return {
+      adaptedConfig: config,
+      responsive: true,
+      breakpoint: this.getCurrentBreakpoint(dimensions.width, dimensions.height)
+    };
+  }
+}
+
+// Mock LayoutTemplates
+class MockLayoutTemplates {
+  createLayoutConfig(templateName, options = {}) {
+    return {
+      templateId: templateName,
+      areas: { main: '1 / 1 / 6 / 13' },
+      content: [{ type: 'body', text: 'Template content', area: 'main' }]
+    };
+  }
+
+  getTemplate(name) {
+    return {
+      name: 'Test Template',
+      areas: { main: '1 / 1 / 6 / 13' },
+      defaultContent: ['body']
+    };
+  }
+
+  generatePreview(templateName) {
+    return {
+      templateId: templateName,
+      name: 'Preview Template',
+      content: [{ type: 'body', text: 'Preview content' }]
+    };
+  }
+}
+
+// Enhanced LayoutService for testing
 class LayoutService {
   constructor(slidesService) {
     this.slidesService = slidesService;
     this.designSystem = this.initializeDesignSystem();
+    
+    // Initialize advanced layout components
+    this.gridSystem = new MockGridSystem();
+    this.responsiveEngine = new MockResponsiveEngine();
+    this.layoutTemplates = new MockLayoutTemplates();
   }
 
   initializeDesignSystem() {
@@ -57,7 +121,9 @@ class LayoutService {
         'single-column': { columns: 1, description: 'Single column layout' },
         'double-column': { columns: 2, description: 'Two column layout' },
         'title-content': { rows: [1, 4], description: 'Title and content layout' },
-        'three-column': { columns: 3, description: 'Three column layout' }
+        'three-column': { columns: 3, description: 'Three column layout' },
+        'custom-grid': { type: 'template', description: 'Template-based advanced layout' },
+        'responsive-grid': { type: 'responsive', description: 'Responsive grid layout' }
       }
     };
   }
@@ -173,29 +239,42 @@ class LayoutService {
       layoutType = 'single-column',
       theme = 'default',
       content = [],
-      slideIndex = 0
+      slideIndex = 0,
+      template = null,
+      responsive = true,
+      customAreas = null
     } = config;
 
     try {
       const slideDimensions = this.slidesService.getSlideDimensions(presentationId);
-      const grid = this.createGridSystem(slideDimensions, layoutType);
       const themeConfig = this.designSystem.themes[theme];
 
-      const layoutResult = this.renderLayout(
-        presentationId,
-        slideIndex,
-        layoutType,
-        content,
-        grid,
-        themeConfig
-      );
+      // Enhanced layout creation with new capabilities
+      let layoutResult;
+      
+      if (template) {
+        // Use template-based layout
+        layoutResult = this.createTemplateLayout(presentationId, slideIndex, template, content, slideDimensions, themeConfig, responsive);
+      } else if (layoutType === 'custom-grid' || customAreas) {
+        // Use custom grid layout
+        layoutResult = this.createCustomGridLayout(presentationId, slideIndex, customAreas, content, slideDimensions, themeConfig, responsive);
+      } else if (layoutType === 'responsive-grid') {
+        // Use responsive grid layout
+        layoutResult = this.createResponsiveGridLayout(presentationId, slideIndex, content, slideDimensions, themeConfig);
+      } else {
+        // Use legacy layout system for backward compatibility
+        const grid = this.createGridSystem(slideDimensions, layoutType);
+        layoutResult = this.renderLayout(presentationId, slideIndex, layoutType, content, grid, themeConfig);
+      }
 
       return {
         success: true,
         layoutType,
         theme,
+        template,
         elementsCreated: layoutResult.elements.length,
         slideDimensions,
+        responsive: layoutResult.responsive || false,
         elements: layoutResult.elements
       };
 
@@ -338,9 +417,89 @@ class LayoutService {
       responsive: true
     };
   }
+
+  // Advanced layout methods for testing
+  createTemplateLayout(presentationId, slideIndex, templateName, content, slideDimensions, theme, responsive) {
+    const templateConfig = this.layoutTemplates.createLayoutConfig(templateName);
+    const grid = this.gridSystem.createAdvancedGrid({
+      slideDimensions,
+      areas: templateConfig.areas,
+      columns: 12
+    });
+    
+    const elements = content.map((item, index) => ({
+      id: `template-element-${index}`,
+      type: item.type || 'body',
+      text: item.text || '',
+      template: templateName,
+      responsive: responsive
+    }));
+
+    return { elements, template: templateName, responsive };
+  }
+
+  createCustomGridLayout(presentationId, slideIndex, customAreas, content, slideDimensions, theme, responsive) {
+    const grid = this.gridSystem.createAdvancedGrid({
+      slideDimensions,
+      areas: customAreas,
+      columns: 12
+    });
+    
+    const elements = content.map((item, index) => ({
+      id: `custom-element-${index}`,
+      type: item.type || 'body',
+      text: item.text || '',
+      customGrid: true,
+      responsive: responsive
+    }));
+
+    return { elements, responsive };
+  }
+
+  createResponsiveGridLayout(presentationId, slideIndex, content, slideDimensions, theme) {
+    const breakpoint = this.responsiveEngine.getCurrentBreakpoint(slideDimensions.width, slideDimensions.height);
+    const grid = this.gridSystem.createAdvancedGrid({
+      slideDimensions,
+      columns: breakpoint.columns
+    });
+    
+    const elements = content.map((item, index) => ({
+      id: `responsive-element-${index}`,
+      type: item.type || 'body',
+      text: item.text || '',
+      breakpoint: breakpoint.key,
+      responsive: true
+    }));
+
+    return { elements, responsive: true, breakpoint: breakpoint.key };
+  }
+
+  getAvailableTemplates() {
+    return [
+      { category: 'Basic', templates: [{ id: 'single-column', name: 'Single Column' }] },
+      { category: 'Advanced', templates: [{ id: 'hero-content', name: 'Hero Content' }] }
+    ];
+  }
+
+  generateLayoutPreview(layoutType) {
+    return this.layoutTemplates.generatePreview(layoutType);
+  }
+
+  getDesignSystemInfo() {
+    return {
+      fonts: Object.keys(this.designSystem.fonts),
+      layouts: Object.keys(this.designSystem.layouts),
+      themes: Object.keys(this.designSystem.themes),
+      spacingBase: this.designSystem.spacing.base,
+      colorPalette: Object.keys(this.designSystem.colors),
+      templates: ['single-column', 'hero-content', 'feature-showcase'],
+      responsive: true,
+      gridSystem: true
+    };
+  }
 }
 
-describe('LayoutService', () => {
+describe('Enhanced LayoutService', () => {
   let layoutService;
   let mockSlidesService;
   let mockLogger;
@@ -746,6 +905,127 @@ describe('LayoutService', () => {
     });
   });
 
+  describe('Advanced Layout Features', () => {
+    test('should create template-based layout', () => {
+      const presentationId = 'test-presentation';
+      const content = [{ type: 'title', text: 'Template Title' }];
+      
+      mockSlidesService.getSlideDimensions = jest.fn().mockReturnValue({ width: 1920, height: 1080 });
+      
+      const result = layoutService.createLayout(presentationId, {
+        template: 'hero-content',
+        content: content,
+        responsive: true
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.template).toBe('hero-content');
+      expect(result.responsive).toBe(true);
+      expect(result.elements[0].template).toBe('hero-content');
+    });
+
+    test('should create custom grid layout', () => {
+      const presentationId = 'test-presentation';
+      const customAreas = {
+        header: '1 / 1 / 2 / 13',
+        main: '2 / 1 / 6 / 13'
+      };
+      const content = [
+        { type: 'heading', text: 'Header Content' },
+        { type: 'body', text: 'Main Content' }
+      ];
+      
+      mockSlidesService.getSlideDimensions = jest.fn().mockReturnValue({ width: 1920, height: 1080 });
+      
+      const result = layoutService.createLayout(presentationId, {
+        layoutType: 'custom-grid',
+        customAreas: customAreas,
+        content: content,
+        responsive: true
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.responsive).toBe(true);
+      expect(result.elements[0].customGrid).toBe(true);
+    });
+
+    test('should create responsive grid layout', () => {
+      const presentationId = 'test-presentation';
+      const content = [
+        { type: 'body', text: 'Item 1' },
+        { type: 'body', text: 'Item 2' },
+        { type: 'body', text: 'Item 3' }
+      ];
+      
+      mockSlidesService.getSlideDimensions = jest.fn().mockReturnValue({ width: 768, height: 432 });
+      
+      const result = layoutService.createLayout(presentationId, {
+        layoutType: 'responsive-grid',
+        content: content
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.responsive).toBe(true);
+      expect(result.elements[0].breakpoint).toBe('sm'); // Small screen
+    });
+
+    test('should adapt to different screen sizes', () => {
+      const presentationId = 'test-presentation';
+      const content = [{ type: 'body', text: 'Responsive content' }];
+      
+      // Test mobile size
+      mockSlidesService.getSlideDimensions = jest.fn().mockReturnValue({ width: 480, height: 270 });
+      const mobileResult = layoutService.createLayout(presentationId, {
+        layoutType: 'responsive-grid',
+        content: content
+      });
+      
+      // Test desktop size
+      mockSlidesService.getSlideDimensions = jest.fn().mockReturnValue({ width: 1920, height: 1080 });
+      const desktopResult = layoutService.createLayout(presentationId, {
+        layoutType: 'responsive-grid',
+        content: content
+      });
+      
+      expect(mobileResult.elements[0].breakpoint).toBe('sm');
+      expect(desktopResult.elements[0].breakpoint).toBe('lg');
+    });
+  });
+
+  describe('Template System', () => {
+    test('should get available templates', () => {
+      const templates = layoutService.getAvailableTemplates();
+      
+      expect(templates).toHaveLength(2);
+      expect(templates[0].category).toBe('Basic');
+      expect(templates[1].category).toBe('Advanced');
+    });
+
+    test('should generate layout preview', () => {
+      const preview = layoutService.generateLayoutPreview('hero-content');
+      
+      expect(preview.templateId).toBe('hero-content');
+      expect(preview.name).toBe('Preview Template');
+      expect(Array.isArray(preview.content)).toBe(true);
+    });
+  });
+
+  describe('Enhanced Design System', () => {
+    test('should provide comprehensive design system info', () => {
+      const dsInfo = layoutService.getDesignSystemInfo();
+      
+      expect(dsInfo.responsive).toBe(true);
+      expect(dsInfo.gridSystem).toBe(true);
+      expect(Array.isArray(dsInfo.templates)).toBe(true);
+      expect(dsInfo.templates).toContain('hero-content');
+    });
+
+    test('should support new layout types', () => {
+      expect(layoutService.designSystem.layouts).toHaveProperty('custom-grid');
+      expect(layoutService.designSystem.layouts).toHaveProperty('responsive-grid');
+    });
+  });
+
   describe('Performance Considerations', () => {
     test('should handle large content arrays efficiently', () => {
       const presentationId = 'test-presentation';
@@ -788,6 +1068,115 @@ describe('LayoutService', () => {
       expect(mockSlidesService.getMethodCallCount('getSlideDimensions')).toBe(1);
       // Should call insertTextBox once per content item
       expect(mockSlidesService.getMethodCallCount('insertTextBox')).toBe(3);
+    });
+  });
+
+  describe('Error Handling and Edge Cases', () => {
+    test('should handle empty content arrays', () => {
+      const presentationId = 'test-presentation';
+      mockSlidesService.getSlideDimensions = jest.fn().mockReturnValue({ width: 960, height: 540 });
+      
+      const result = layoutService.createLayout(presentationId, {
+        layoutType: 'single-column',
+        content: []
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.elementsCreated).toBe(0);
+    });
+
+    test('should handle null template gracefully', () => {
+      const presentationId = 'test-presentation';
+      const content = [{ type: 'body', text: 'Test content' }];
+      mockSlidesService.getSlideDimensions = jest.fn().mockReturnValue({ width: 960, height: 540 });
+      
+      const result = layoutService.createLayout(presentationId, {
+        template: null,
+        content: content
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.template).toBeNull();
+    });
+
+    test('should handle invalid slide dimensions', () => {
+      const presentationId = 'test-presentation';
+      mockSlidesService.getSlideDimensions = jest.fn().mockReturnValue({ width: 0, height: 0 });
+      
+      expect(() => {
+        layoutService.createLayout(presentationId, {
+          layoutType: 'single-column',
+          content: [{ text: 'Test' }]
+        });
+      }).toThrow();
+    });
+  });
+
+  describe('Responsive Behavior', () => {
+    test('should adapt font sizes for different screen sizes', () => {
+      const smallFontSize = layoutService.calculateResponsiveFontSize({
+        baseSize: 24,
+        slideWidth: 480,
+        slideHeight: 270
+      });
+      
+      const largeFontSize = layoutService.calculateResponsiveFontSize({
+        baseSize: 24,
+        slideWidth: 1920,
+        slideHeight: 1080
+      });
+      
+      expect(largeFontSize).toBeGreaterThan(smallFontSize);
+    });
+
+    test('should provide correct breakpoint detection', () => {
+      // Test with mock responsive engine
+      const smallBreakpoint = layoutService.responsiveEngine.getCurrentBreakpoint(480, 270);
+      const largeBreakpoint = layoutService.responsiveEngine.getCurrentBreakpoint(1920, 1080);
+      
+      expect(smallBreakpoint.key).toBe('sm');
+      expect(largeBreakpoint.key).toBe('lg');
+      expect(smallBreakpoint.columns).toBeLessThan(largeBreakpoint.columns);
+    });
+  });
+
+  describe('Integration Testing', () => {
+    test('should work with all layout types', () => {
+      const presentationId = 'test-presentation';
+      const content = [{ type: 'body', text: 'Test content' }];
+      const layouts = ['single-column', 'double-column', 'custom-grid', 'responsive-grid'];
+      
+      mockSlidesService.getSlideDimensions = jest.fn().mockReturnValue({ width: 960, height: 540 });
+      
+      layouts.forEach(layoutType => {
+        const config = { layoutType, content };
+        if (layoutType === 'custom-grid') {
+          config.customAreas = { main: '1 / 1 / 6 / 13' };
+        }
+        
+        const result = layoutService.createLayout(presentationId, config);
+        expect(result.success).toBe(true);
+      });
+    });
+
+    test('should maintain consistency across multiple calls', () => {
+      const presentationId = 'test-presentation';
+      const content = [{ type: 'title', text: 'Consistent Test' }];
+      
+      mockSlidesService.getSlideDimensions = jest.fn().mockReturnValue({ width: 960, height: 540 });
+      
+      const result1 = layoutService.createLayout(presentationId, {
+        layoutType: 'single-column',
+        content: content
+      });
+      
+      const result2 = layoutService.createLayout(presentationId, {
+        layoutType: 'single-column',
+        content: content
+      });
+      
+      expect(result1.elementsCreated).toBe(result2.elementsCreated);
+      expect(result1.layoutType).toBe(result2.layoutType);
     });
   });
 });
