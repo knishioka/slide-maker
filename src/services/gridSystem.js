@@ -96,12 +96,275 @@ class GridSystem {
     const x = margins.left + ((colStart - 1) * (columnWidth + gap));
     const width = ((colEnd - colStart) * columnWidth) + ((colEnd - colStart - 1) * gap);
     
-    // Row calculations (simplified for now, can be enhanced)
-    const rowHeight = 100; // Base row height, should be calculated dynamically
+    // Dynamic row calculations
+    const rowHeight = this.calculateRowHeight(area, margins);
     const y = margins.top + ((rowStart - 1) * (rowHeight + gap));
     const height = ((rowEnd - rowStart) * rowHeight) + ((rowEnd - rowStart - 1) * gap);
+    
+    return {
+      x: Math.round(x),
+      y: Math.round(y),
+      width: Math.round(width),
+      height: Math.round(height)
+    };
+  }
 
-    return { x, y, width, height };
+  /**
+   * Calculate dynamic row height based on content and constraints
+   * @param {Object} area - Grid area definition
+   * @param {Object} margins - Grid margins
+   * @returns {number} Calculated row height
+   */
+  calculateRowHeight(area, margins) {
+    // Base row height calculation
+    const minRowHeight = 80;
+    const maxRowHeight = 200;
+    
+    // Calculate available height
+    const availableHeight = 720 - margins.top - margins.bottom; // Standard slide height
+    const rowSpan = area.rowEnd - area.rowStart;
+    
+    // Calculate optimal row height
+    let rowHeight = availableHeight / 6; // Default to 6 rows
+    
+    // Adjust for row span
+    if (rowSpan > 1) {
+      rowHeight = Math.max(minRowHeight, rowHeight * 0.8);
+    }
+    
+    return Math.min(Math.max(rowHeight, minRowHeight), maxRowHeight);
+  }
+
+  /**
+   * Create flexbox-style layout
+   * @param {Object} config - Flexbox configuration
+   * @returns {Object} Flexbox layout system
+   */
+  createFlexLayout(config) {
+    const {
+      slideDimensions,
+      direction = 'row', // 'row' | 'column'
+      justifyContent = 'space-between', // 'flex-start' | 'center' | 'space-between' | 'space-around'
+      alignItems = 'stretch', // 'flex-start' | 'center' | 'flex-end' | 'stretch'
+      wrap = 'nowrap', // 'nowrap' | 'wrap'
+      gap = 16,
+      margins = { top: 32, right: 32, bottom: 32, left: 32 }
+    } = config;
+
+    const { width, height } = slideDimensions;
+    const contentWidth = width - margins.left - margins.right;
+    const contentHeight = height - margins.top - margins.bottom;
+
+    return {
+      width,
+      height,
+      contentWidth,
+      contentHeight,
+      direction,
+      justifyContent,
+      alignItems,
+      wrap,
+      gap,
+      margins,
+
+      // Flexbox positioning functions
+      distributeItems: (items) => this.distributeFlexItems(items, {
+        contentWidth,
+        contentHeight,
+        direction,
+        justifyContent,
+        alignItems,
+        gap,
+        margins
+      }),
+
+      calculateItemDimensions: (itemCount) => this.calculateFlexItemDimensions(itemCount, {
+        contentWidth,
+        contentHeight,
+        direction,
+        gap
+      })
+    };
+  }
+
+  /**
+   * Distribute items in flexbox layout
+   * @param {Array} items - Items to distribute
+   * @param {Object} flexConfig - Flex configuration
+   * @returns {Array} Positioned items
+   */
+  distributeFlexItems(items, flexConfig) {
+    const { contentWidth, contentHeight, direction, justifyContent, alignItems, gap, margins } = flexConfig;
+    const itemCount = items.length;
+
+    if (itemCount === 0) return [];
+
+    // Calculate item dimensions
+    const itemDimensions = this.calculateFlexItemDimensions(itemCount, {
+      contentWidth,
+      contentHeight,
+      direction,
+      gap
+    });
+
+    // Calculate positions based on justifyContent
+    const positions = this.calculateFlexPositions(itemCount, {
+      contentWidth,
+      contentHeight,
+      direction,
+      justifyContent,
+      alignItems,
+      gap,
+      itemDimensions
+    });
+
+    return items.map((item, index) => ({
+      ...item,
+      position: {
+        x: Math.round(margins.left + positions[index].x),
+        y: Math.round(margins.top + positions[index].y),
+        width: Math.round(itemDimensions.width),
+        height: Math.round(itemDimensions.height)
+      },
+      flexIndex: index
+    }));
+  }
+
+  /**
+   * Calculate flex item dimensions
+   * @param {number} itemCount - Number of items
+   * @param {Object} config - Dimension calculation config
+   * @returns {Object} Item dimensions
+   */
+  calculateFlexItemDimensions(itemCount, config) {
+    const { contentWidth, contentHeight, direction, gap } = config;
+
+    if (direction === 'row') {
+      const totalGaps = (itemCount - 1) * gap;
+      const availableWidth = contentWidth - totalGaps;
+      return {
+        width: availableWidth / itemCount,
+        height: contentHeight
+      };
+    } else {
+      const totalGaps = (itemCount - 1) * gap;
+      const availableHeight = contentHeight - totalGaps;
+      return {
+        width: contentWidth,
+        height: availableHeight / itemCount
+      };
+    }
+  }
+
+  /**
+   * Calculate flex item positions
+   * @param {number} itemCount - Number of items
+   * @param {Object} config - Position calculation config
+   * @returns {Array} Item positions
+   */
+  calculateFlexPositions(itemCount, config) {
+    const { contentWidth, contentHeight, direction, justifyContent, alignItems, gap, itemDimensions } = config;
+    const positions = [];
+
+    for (let i = 0; i < itemCount; i++) {
+      let x = 0;
+      let y = 0;
+
+      if (direction === 'row') {
+        // Calculate X position based on justifyContent
+        const totalItemsWidth = itemCount * itemDimensions.width + (itemCount - 1) * gap;
+        const remainingSpace = contentWidth - totalItemsWidth;
+
+        switch (justifyContent) {
+          case 'flex-start':
+            x = i * (itemDimensions.width + gap);
+            break;
+          case 'center':
+            x = remainingSpace / 2 + i * (itemDimensions.width + gap);
+            break;
+          case 'flex-end':
+            x = remainingSpace + i * (itemDimensions.width + gap);
+            break;
+          case 'space-between':
+            if (itemCount === 1) {
+              x = remainingSpace / 2;
+            } else {
+              x = i * (itemDimensions.width + remainingSpace / (itemCount - 1));
+            }
+            break;
+          case 'space-around':
+            const spacePerItem = remainingSpace / itemCount;
+            x = spacePerItem / 2 + i * (itemDimensions.width + spacePerItem);
+            break;
+          default:
+            x = i * (itemDimensions.width + gap);
+        }
+
+        // Calculate Y position based on alignItems
+        switch (alignItems) {
+          case 'flex-start':
+            y = 0;
+            break;
+          case 'center':
+            y = (contentHeight - itemDimensions.height) / 2;
+            break;
+          case 'flex-end':
+            y = contentHeight - itemDimensions.height;
+            break;
+          case 'stretch':
+          default:
+            y = 0;
+        }
+      } else {
+        // Column direction
+        switch (alignItems) {
+          case 'flex-start':
+            x = 0;
+            break;
+          case 'center':
+            x = (contentWidth - itemDimensions.width) / 2;
+            break;
+          case 'flex-end':
+            x = contentWidth - itemDimensions.width;
+            break;
+          case 'stretch':
+          default:
+            x = 0;
+        }
+
+        const totalItemsHeight = itemCount * itemDimensions.height + (itemCount - 1) * gap;
+        const remainingSpace = contentHeight - totalItemsHeight;
+
+        switch (justifyContent) {
+          case 'flex-start':
+            y = i * (itemDimensions.height + gap);
+            break;
+          case 'center':
+            y = remainingSpace / 2 + i * (itemDimensions.height + gap);
+            break;
+          case 'flex-end':
+            y = remainingSpace + i * (itemDimensions.height + gap);
+            break;
+          case 'space-between':
+            if (itemCount === 1) {
+              y = remainingSpace / 2;
+            } else {
+              y = i * (itemDimensions.height + remainingSpace / (itemCount - 1));
+            }
+            break;
+          case 'space-around':
+            const spacePerItem = remainingSpace / itemCount;
+            y = spacePerItem / 2 + i * (itemDimensions.height + spacePerItem);
+            break;
+          default:
+            y = i * (itemDimensions.height + gap);
+        }
+      }
+
+      positions.push({ x, y });
+    }
+
+    return positions;
   }
 
   /**

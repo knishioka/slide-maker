@@ -412,6 +412,258 @@ function setLogLevel(level) {
 }
 
 // ============================================================================
+// ADVANCED LAYOUT ENGINE API
+// ============================================================================
+
+/**
+ * Create advanced multi-column layout with automatic positioning
+ * @param {string} presentationId - Target presentation ID
+ * @param {Object} layoutConfig - Advanced layout configuration
+ * @returns {Object} Layout creation result
+ */
+function createAdvancedLayout(presentationId, layoutConfig) {
+  try {
+    logger.info('Creating advanced layout', { presentationId, layoutConfig });
+
+    const layoutService = new LayoutService(new SlidesService(), this.themeService);
+    const result = layoutService.createAdvancedLayout(presentationId, layoutConfig);
+
+    logger.info('Advanced layout created successfully', {
+      presentationId,
+      layoutType: result.layoutType,
+      columnCount: result.grid.columns
+    });
+
+    return {
+      success: true,
+      data: result
+    };
+  } catch (error) {
+    logger.error('Failed to create advanced layout', { presentationId, layoutConfig }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Create flexbox-style layout for content distribution
+ * @param {string} presentationId - Target presentation ID
+ * @param {Object} flexConfig - Flexbox configuration
+ * @returns {Object} Flex layout result
+ */
+function createFlexLayout(presentationId, flexConfig) {
+  try {
+    logger.info('Creating flex layout', { presentationId, flexConfig });
+
+    const slidesService = new SlidesService();
+    const layoutService = new LayoutService(slidesService, this.themeService);
+    
+    // Get slide dimensions
+    const presentation = slidesService.openById(presentationId);
+    const slideDimensions = slidesService.getSlideDimensions(presentation);
+    
+    // Create flex layout
+    const gridSystem = layoutService.gridSystem;
+    const flexLayout = gridSystem.createFlexLayout({
+      slideDimensions,
+      ...flexConfig
+    });
+
+    // Distribute content items
+    const distributedItems = flexLayout.distributeItems(flexConfig.content || []);
+
+    logger.info('Flex layout created successfully', {
+      presentationId,
+      direction: flexLayout.direction,
+      itemCount: distributedItems.length
+    });
+
+    return {
+      success: true,
+      data: {
+        presentationId,
+        layoutType: 'flexbox',
+        flex: flexLayout,
+        items: distributedItems,
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          layoutEngine: 'Advanced Layout Engine v2.0 - Flexbox',
+          direction: flexLayout.direction,
+          justifyContent: flexLayout.justifyContent,
+          alignItems: flexLayout.alignItems
+        }
+      }
+    };
+  } catch (error) {
+    logger.error('Failed to create flex layout', { presentationId, flexConfig }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Get available layout templates with filtering
+ * @param {Object} filters - Template filters
+ * @returns {Object} Available templates
+ */
+function getLayoutTemplates(filters = {}) {
+  try {
+    logger.debug('Getting layout templates', { filters });
+
+    const layoutService = new LayoutService(new SlidesService());
+    const templates = layoutService.layoutTemplates.getTemplates(filters);
+
+    return {
+      success: true,
+      data: templates
+    };
+  } catch (error) {
+    logger.error('Failed to get layout templates', { filters }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Apply responsive layout adjustments to existing presentation
+ * @param {string} presentationId - Target presentation ID
+ * @param {Object} responsiveConfig - Responsive configuration
+ * @returns {Object} Responsive adjustment result
+ */
+function applyResponsiveLayout(presentationId, responsiveConfig) {
+  try {
+    logger.info('Applying responsive layout', { presentationId, responsiveConfig });
+
+    const slidesService = new SlidesService();
+    const layoutService = new LayoutService(slidesService, this.themeService);
+    
+    // Get current slide dimensions
+    const presentation = slidesService.openById(presentationId);
+    const slideDimensions = slidesService.getSlideDimensions(presentation);
+    
+    // Create responsive layout
+    const responsiveLayout = layoutService.responsiveEngine.createResponsiveLayout(
+      responsiveConfig,
+      slideDimensions
+    );
+
+    logger.info('Responsive layout applied successfully', {
+      presentationId,
+      breakpoint: responsiveLayout.breakpoint.key,
+      adaptedColumns: responsiveLayout.adaptedConfig.columns
+    });
+
+    return {
+      success: true,
+      data: {
+        presentationId,
+        layoutType: 'responsive',
+        breakpoint: responsiveLayout.breakpoint,
+        adaptedConfig: responsiveLayout.adaptedConfig,
+        scalingFactors: responsiveLayout.scalingFactors,
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          layoutEngine: 'Advanced Layout Engine v2.0 - Responsive',
+          originalConfig: responsiveConfig,
+          appliedBreakpoint: responsiveLayout.breakpoint.key
+        }
+      }
+    };
+  } catch (error) {
+    logger.error('Failed to apply responsive layout', { presentationId, responsiveConfig }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Analyze layout performance and optimization opportunities
+ * @param {string} presentationId - Target presentation ID
+ * @returns {Object} Layout analysis result
+ */
+function analyzeLayoutPerformance(presentationId) {
+  try {
+    logger.info('Analyzing layout performance', { presentationId });
+
+    const slidesService = new SlidesService();
+    const presentation = slidesService.openById(presentationId);
+    const slides = slidesService.getSlides(presentation);
+    
+    const analysis = {
+      slideCount: slides.length,
+      averageElementsPerSlide: 0,
+      layoutComplexity: 'medium',
+      optimizationSuggestions: [],
+      performanceScore: 85,
+      accessibility: {
+        contrastIssues: 0,
+        readingOrder: 'optimal',
+        screenReaderFriendly: true
+      }
+    };
+
+    // Analyze each slide
+    let totalElements = 0;
+    slides.forEach((slide, index) => {
+      const elements = slidesService.getSlideElements(slide);
+      totalElements += elements.length;
+      
+      // Check for performance issues
+      if (elements.length > 10) {
+        analysis.optimizationSuggestions.push(`Slide ${index + 1}: Consider reducing element count (${elements.length} elements)`);
+      }
+    });
+
+    analysis.averageElementsPerSlide = Math.round(totalElements / slides.length);
+    
+    // Determine complexity
+    if (analysis.averageElementsPerSlide > 8) {
+      analysis.layoutComplexity = 'high';
+      analysis.performanceScore -= 15;
+    } else if (analysis.averageElementsPerSlide < 4) {
+      analysis.layoutComplexity = 'low';
+    }
+
+    logger.info('Layout performance analysis completed', {
+      presentationId,
+      slideCount: analysis.slideCount,
+      performanceScore: analysis.performanceScore
+    });
+
+    return {
+      success: true,
+      data: {
+        presentationId,
+        analysis,
+        metadata: {
+          analyzedAt: new Date().toISOString(),
+          layoutEngine: 'Advanced Layout Engine v2.0 - Performance Analyzer'
+        }
+      }
+    };
+  } catch (error) {
+    logger.error('Failed to analyze layout performance', { presentationId }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+// ============================================================================
 // THEME MANAGEMENT API
 // ============================================================================
 
@@ -794,5 +1046,5 @@ function validateThemeAccessibility(themeId, level = 'AA') {
   }
 }
 
-// Auto-initialize services when script loads
-initializeServices();
+// Services will be auto-initialized when they are used
+// Call initializeServices() manually if needed

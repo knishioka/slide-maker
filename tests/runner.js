@@ -21,6 +21,17 @@ class TestRunner {
     };
     this.testFiles = [];
     this.currentSuite = null;
+    this.setupGlobalMocks();
+  }
+
+  /**
+   * Setup global mock functions
+   */
+  setupGlobalMocks() {
+    global.mockFn = this.mockFn.bind(this);
+    global.jest = {
+      fn: this.mockFn.bind(this)
+    };
   }
 
   /**
@@ -218,6 +229,9 @@ class TestRunner {
         console.log(`     Error: ${error.message}`);
       }
     };
+
+    // Add global test function alias for it
+    global.test = this.it.bind(this);
 
     global.expect = actual => ({
       toBe: expected => {

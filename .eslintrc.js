@@ -25,6 +25,7 @@ module.exports = {
     // Test globals
     describe: 'readonly',
     it: 'readonly',
+    test: 'readonly',
     expect: 'readonly',
     beforeEach: 'readonly',
     afterEach: 'readonly',
@@ -35,6 +36,13 @@ module.exports = {
     SlidesService: 'readonly',
     ContentService: 'readonly',
     ValidationService: 'readonly',
+    ThemeService: 'readonly',
+    LayoutService: 'readonly',
+    GridSystem: 'readonly',
+    ResponsiveEngine: 'readonly',
+    LayoutTemplates: 'readonly',
+    ColorPaletteUtils: 'readonly',
+    FontManager: 'readonly',
     logger: 'readonly',
     Logger: 'readonly'
   },

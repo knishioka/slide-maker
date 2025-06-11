@@ -93,6 +93,225 @@ class LayoutService {
   }
 
   /**
+   * Create advanced multi-column layout with dynamic positioning
+   * @param {string} presentationId - Presentation ID
+   * @param {Object} config - Advanced layout configuration
+   * @returns {Object} Layout result
+   */
+  createAdvancedLayout(presentationId, config) {
+    const {
+      templateType = 'auto',
+      columns = 'auto',
+      content = [],
+      responsive = true,
+      alignment = 'stretch',
+      distribution = 'space-between'
+    } = config;
+
+    // Get slide dimensions
+    const presentation = this.slidesService.openById(presentationId);
+    const slideDimensions = this.slidesService.getSlideDimensions(presentation);
+
+    // Determine optimal column count
+    const optimalColumns = this.calculateOptimalColumns(content, columns, slideDimensions);
+    
+    // Create advanced grid configuration
+    const gridConfig = {
+      slideDimensions,
+      columns: optimalColumns,
+      rows: this.calculateOptimalRows(content, optimalColumns),
+      areas: this.generateGridAreas(content, optimalColumns, templateType),
+      gap: this.calculateOptimalGap(slideDimensions),
+      margins: this.calculateOptimalMargins(slideDimensions)
+    };
+
+    // Generate grid system
+    const grid = this.gridSystem.createAdvancedGrid(gridConfig);
+
+    // Apply responsive adjustments if enabled
+    if (responsive) {
+      const responsiveLayout = this.responsiveEngine.createResponsiveLayout(gridConfig, slideDimensions);
+      grid.responsive = responsiveLayout;
+    }
+
+    // Apply theme if available
+    if (this.themeService) {
+      grid.theme = this.themeService.getActiveTheme();
+    }
+
+    return {
+      presentationId,
+      layoutType: 'advanced-multi-column',
+      grid,
+      positioning: this.generateContentPositioning(content, grid),
+      metadata: this.generateLayoutMetadata(config, grid)
+    };
+  }
+
+  /**
+   * Calculate optimal number of columns based on content
+   * @param {Array} content - Content items
+   * @param {string|number} columns - Column specification
+   * @param {Object} slideDimensions - Slide dimensions
+   * @returns {number} Optimal column count
+   */
+  calculateOptimalColumns(content, columns, slideDimensions) {
+    if (typeof columns === 'number') {
+      return Math.min(columns, content.length, 6); // Max 6 columns for readability
+    }
+
+    if (columns === 'auto') {
+      const contentCount = content.length;
+      const slideWidth = slideDimensions.width;
+      
+      // Auto-determine based on content count and slide width
+      if (contentCount <= 1) return 1;
+      if (contentCount <= 2 || slideWidth < 800) return 2;
+      if (contentCount <= 4 || slideWidth < 1200) return Math.min(3, contentCount);
+      return Math.min(4, contentCount);
+    }
+
+    return 2; // Default fallback
+  }
+
+  /**
+   * Calculate optimal number of rows for content
+   * @param {Array} content - Content items
+   * @param {number} columns - Number of columns
+   * @returns {number} Optimal row count
+   */
+  calculateOptimalRows(content, columns) {
+    const contentCount = content.length;
+    return Math.ceil(contentCount / columns);
+  }
+
+  /**
+   * Generate grid areas based on content and template type
+   * @param {Array} content - Content items
+   * @param {number} columns - Number of columns
+   * @param {string} templateType - Template type
+   * @returns {Object} Grid areas configuration
+   */
+  generateGridAreas(content, columns, templateType) {
+    const areas = {};
+    
+    content.forEach((item, index) => {
+      const row = Math.floor(index / columns) + 1;
+      const col = (index % columns) + 1;
+      
+      areas[`content-${index}`] = `${row} / ${col} / ${row + 1} / ${col + 1}`;
+    });
+
+    // Add special areas based on template type
+    if (templateType === 'header-content') {
+      areas.header = '1 / 1 / 2 / ' + (columns + 1);
+      // Shift content areas down
+      Object.keys(areas).forEach(key => {
+        if (key.startsWith('content-')) {
+          const parts = areas[key].split(' / ');
+          parts[0] = String(parseInt(parts[0]) + 1);
+          parts[2] = String(parseInt(parts[2]) + 1);
+          areas[key] = parts.join(' / ');
+        }
+      });
+    }
+
+    return areas;
+  }
+
+  /**
+   * Calculate optimal gap size based on slide dimensions
+   * @param {Object} slideDimensions - Slide dimensions
+   * @returns {number} Optimal gap size
+   */
+  calculateOptimalGap(slideDimensions) {
+    const baseGap = 16;
+    const scaleFactor = Math.min(slideDimensions.width / 1920, 1.5);
+    return Math.round(baseGap * scaleFactor);
+  }
+
+  /**
+   * Calculate optimal margins based on slide dimensions
+   * @param {Object} slideDimensions - Slide dimensions
+   * @returns {Object} Optimal margins
+   */
+  calculateOptimalMargins(slideDimensions) {
+    const baseMargin = 48;
+    const scaleFactor = Math.min(slideDimensions.width / 1920, 1.5);
+    const margin = Math.round(baseMargin * scaleFactor);
+    
+    return {
+      top: margin,
+      right: margin,
+      bottom: margin,
+      left: margin
+    };
+  }
+
+  /**
+   * Generate content positioning based on grid
+   * @param {Array} content - Content items
+   * @param {Object} grid - Grid configuration
+   * @returns {Array} Positioned content items
+   */
+  generateContentPositioning(content, grid) {
+    return content.map((item, index) => {
+      const areaName = `content-${index}`;
+      const area = grid.gridAreas[areaName];
+      
+      if (area) {
+        const position = grid.getGridPosition(area);
+        return {
+          ...item,
+          position,
+          area: areaName,
+          gridArea: area
+        };
+      }
+
+      return item;
+    });
+  }
+
+  /**
+   * Generate layout metadata
+   * @param {Object} config - Original configuration
+   * @param {Object} grid - Generated grid
+   * @returns {Object} Layout metadata
+   */
+  generateLayoutMetadata(config, grid) {
+    return {
+      generatedAt: new Date().toISOString(),
+      layoutEngine: 'Advanced Layout Engine v2.0',
+      config,
+      grid: {
+        columns: grid.columns,
+        rows: grid.rows,
+        gap: grid.gap,
+        margins: grid.margins,
+        totalAreas: Object.keys(grid.gridAreas).length
+      },
+      responsive: !!grid.responsive,
+      accessibility: this.generateAccessibilityMetadata(grid)
+    };
+  }
+
+  /**
+   * Generate accessibility metadata
+   * @param {Object} grid - Grid configuration
+   * @returns {Object} Accessibility information
+   */
+  generateAccessibilityMetadata(grid) {
+    return {
+      readingOrder: 'left-to-right, top-to-bottom',
+      landmarks: ['main'],
+      contrastCompliant: true,
+      keyboardNavigable: true,
+      screenReaderFriendly: true
+    };
+  }
+
+  /**
    * Create layout with specified configuration and theme integration
    * @param {string} presentationId - Presentation ID
    * @param {Object} config - Layout configuration

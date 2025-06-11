@@ -10,6 +10,7 @@ class EnhancedGASMocks {
     this.files = new Map();
     this.properties = new Map();
     this.logs = [];
+    this.mockFn = global.mockFn || this.createMockFn;
     this.setupSlidesAppMock();
     this.setupDriveAppMock();
     this.setupUtilitiesMock();
@@ -18,12 +19,58 @@ class EnhancedGASMocks {
     this.setupHtmlServiceMock();
     this.setupLoggerMock();
   }
+
+  createMockFn(implementation) {
+    const mockData = {
+      calls: [],
+      results: [],
+      instances: [],
+      implementation: implementation || (() => {}),
+      returnValue: undefined,
+      hasReturnValue: false
+    };
+    
+    const mockFunction = function (...args) {
+      mockData.calls.push([...args]);
+      mockData.instances.push(this);
+      
+      try {
+        let result;
+        if (mockData.hasReturnValue) {
+          result = mockData.returnValue;
+        } else {
+          result = mockData.implementation.apply(this, args);
+        }
+        
+        mockData.results.push({ type: 'return', value: result });
+        return result;
+      } catch (error) {
+        mockData.results.push({ type: 'throw', value: error });
+        throw error;
+      }
+    };
+    
+    mockFunction.mock = mockData;
+    mockFunction.mockReturnValue = (value) => {
+      mockData.returnValue = value;
+      mockData.hasReturnValue = true;
+      return mockFunction;
+    };
+    
+    mockFunction.mockImplementation = (impl) => {
+      mockData.implementation = impl;
+      mockData.hasReturnValue = false;
+      return mockFunction;
+    };
+    
+    return mockFunction;
+  }
   
   setupSlidesAppMock() {
     const self = this;
     
     global.SlidesApp = {
-      create: jest.fn((title) => {
+      create: this.mockFn((title) => {
         if (!title || typeof title !== 'string') {
           throw new Error('Title is required');
         }
@@ -33,7 +80,7 @@ class EnhancedGASMocks {
         return presentation;
       }),
       
-      openById: jest.fn((id) => {
+      openById: this.mockFn((id) => {
         const presentation = self.presentations.get(id);
         if (!presentation) {
           throw new Error(`Presentation not found: ${id}`);
@@ -41,12 +88,12 @@ class EnhancedGASMocks {
         return presentation;
       }),
       
-      getActivePresentation: jest.fn(() => {
+      getActivePresentation: this.mockFn(() => {
         const presentations = Array.from(self.presentations.values());
         return presentations.length > 0 ? presentations[0] : null;
       }),
       
-      newPresentation: jest.fn(() => {
+      newPresentation: this.mockFn(() => {
         return global.SlidesApp.create('Untitled Presentation');
       })
     };
@@ -58,18 +105,18 @@ class EnhancedGASMocks {
     return {
       getId: () => id,
       getTitle: () => title,
-      setTitle: jest.fn((newTitle) => { 
+      setTitle: this.mockFn((newTitle) => { 
         title = newTitle;
         return this;
       }),
       
-      getSlides: jest.fn(() => {
+      getSlides: this.mockFn(() => {
         return Array.from(self.slides.values())
           .filter(slide => slide.presentationId === id)
           .sort((a, b) => a.index - b.index);
       }),
       
-      appendSlide: jest.fn((layout = 'BLANK') => {
+      appendSlide: this.mockFn((layout = 'BLANK') => {
         const slideId = `slide-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const slideIndex = self.getSlideCount(id);
         const slide = self.createMockSlide(slideId, id, layout, slideIndex);
@@ -77,7 +124,7 @@ class EnhancedGASMocks {
         return slide;
       }),
       
-      insertSlide: jest.fn((index, layout = 'BLANK') => {
+      insertSlide: this.mockFn((index, layout = 'BLANK') => {
         const slideId = `slide-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const slide = self.createMockSlide(slideId, id, layout, index);
         
@@ -90,14 +137,14 @@ class EnhancedGASMocks {
         return slide;
       }),
       
-      removeSlide: jest.fn((slide) => {
+      removeSlide: this.mockFn((slide) => {
         const slideId = typeof slide === 'string' ? slide : slide.getId();
         self.slides.delete(slideId);
       }),
       
-      getUrl: jest.fn(() => `https://docs.google.com/presentation/d/${id}/edit`),
+      getUrl: this.mockFn(() => `https://docs.google.com/presentation/d/${id}/edit`),
       
-      saveAndClose: jest.fn(() => {
+      saveAndClose: this.mockFn(() => {
         // Mock save operation
         return true;
       })
@@ -114,36 +161,36 @@ class EnhancedGASMocks {
       index,
       elements: [],
       
-      getLayout: jest.fn(() => layout),
+      getLayout: this.mockFn(() => layout),
       
-      insertTextBox: jest.fn((text, left = 0, top = 0, width = 100, height = 50) => {
+      insertTextBox: this.mockFn((text, left = 0, top = 0, width = 100, height = 50) => {
         const textBoxId = `textbox-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const textBox = self.createMockTextBox(textBoxId, text, left, top, width, height);
         this.elements.push(textBox);
         return textBox;
       }),
       
-      insertImage: jest.fn((imageUrl, left = 0, top = 0, width = 100, height = 100) => {
+      insertImage: this.mockFn((imageUrl, left = 0, top = 0, width = 100, height = 100) => {
         const imageId = `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const image = self.createMockImage(imageId, imageUrl, left, top, width, height);
         this.elements.push(image);
         return image;
       }),
       
-      insertShape: jest.fn((shapeType, left = 0, top = 0, width = 100, height = 100) => {
+      insertShape: this.mockFn((shapeType, left = 0, top = 0, width = 100, height = 100) => {
         const shapeId = `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const shape = self.createMockShape(shapeId, shapeType, left, top, width, height);
         this.elements.push(shape);
         return shape;
       }),
       
-      getPageElements: jest.fn(() => this.elements),
+      getPageElements: this.mockFn(() => this.elements),
       
-      remove: jest.fn(() => {
+      remove: this.mockFn(() => {
         self.slides.delete(id);
       }),
       
-      duplicate: jest.fn(() => {
+      duplicate: this.mockFn(() => {
         const duplicateId = `slide-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const duplicate = self.createMockSlide(duplicateId, presentationId, layout, index + 1);
         
@@ -177,43 +224,43 @@ class EnhancedGASMocks {
       
       getText: () => ({
         asString: () => currentText,
-        setText: jest.fn((newText) => { 
+        setText: this.mockFn((newText) => { 
           currentText = newText;
           return this;
         }),
-        appendText: jest.fn((appendText) => {
+        appendText: this.mockFn((appendText) => {
           currentText += appendText;
           return this;
         })
       }),
       
-      setText: jest.fn((newText) => { 
+      setText: this.mockFn((newText) => { 
         currentText = newText;
         return this;
       }),
       
-      getTextStyle: jest.fn(() => ({
-        setFontSize: jest.fn((size) => { 
+      getTextStyle: this.mockFn(() => ({
+        setFontSize: this.mockFn((size) => { 
           currentStyle.fontSize = size;
           return this;
         }),
-        setFontFamily: jest.fn((family) => { 
+        setFontFamily: this.mockFn((family) => { 
           currentStyle.fontFamily = family;
           return this;
         }),
-        setForegroundColor: jest.fn((color) => { 
+        setForegroundColor: this.mockFn((color) => { 
           currentStyle.color = color;
           return this;
         }),
-        setBold: jest.fn((bold) => { 
+        setBold: this.mockFn((bold) => { 
           currentStyle.bold = bold;
           return this;
         }),
-        setItalic: jest.fn((italic) => { 
+        setItalic: this.mockFn((italic) => { 
           currentStyle.italic = italic;
           return this;
         }),
-        setUnderline: jest.fn((underline) => { 
+        setUnderline: this.mockFn((underline) => { 
           currentStyle.underline = underline;
           return this;
         }),
@@ -225,19 +272,19 @@ class EnhancedGASMocks {
         isUnderline: () => currentStyle.underline
       })),
       
-      setLeft: jest.fn((newLeft) => { 
+      setLeft: this.mockFn((newLeft) => { 
         position.left = newLeft;
         return this;
       }),
-      setTop: jest.fn((newTop) => { 
+      setTop: this.mockFn((newTop) => { 
         position.top = newTop;
         return this;
       }),
-      setWidth: jest.fn((newWidth) => { 
+      setWidth: this.mockFn((newWidth) => { 
         position.width = newWidth;
         return this;
       }),
-      setHeight: jest.fn((newHeight) => { 
+      setHeight: this.mockFn((newHeight) => { 
         position.height = newHeight;
         return this;
       }),
@@ -247,7 +294,7 @@ class EnhancedGASMocks {
       getWidth: () => position.width,
       getHeight: () => position.height,
       
-      remove: jest.fn(() => {
+      remove: this.mockFn(() => {
         // Remove from parent slide's elements
         return true;
       })
@@ -262,24 +309,24 @@ class EnhancedGASMocks {
       getId: () => id,
       
       getImageUrl: () => currentImageUrl,
-      setImageUrl: jest.fn((url) => {
+      setImageUrl: this.mockFn((url) => {
         currentImageUrl = url;
         return this;
       }),
       
-      setLeft: jest.fn((newLeft) => { 
+      setLeft: this.mockFn((newLeft) => { 
         position.left = newLeft;
         return this;
       }),
-      setTop: jest.fn((newTop) => { 
+      setTop: this.mockFn((newTop) => { 
         position.top = newTop;
         return this;
       }),
-      setWidth: jest.fn((newWidth) => { 
+      setWidth: this.mockFn((newWidth) => { 
         position.width = newWidth;
         return this;
       }),
-      setHeight: jest.fn((newHeight) => { 
+      setHeight: this.mockFn((newHeight) => { 
         position.height = newHeight;
         return this;
       }),
@@ -289,12 +336,12 @@ class EnhancedGASMocks {
       getWidth: () => position.width,
       getHeight: () => position.height,
       
-      replace: jest.fn((imageUrl) => {
+      replace: this.mockFn((imageUrl) => {
         currentImageUrl = imageUrl;
         return this;
       }),
       
-      remove: jest.fn(() => {
+      remove: this.mockFn(() => {
         return true;
       })
     };
@@ -312,39 +359,39 @@ class EnhancedGASMocks {
       
       getShapeType: () => currentShapeType,
       
-      getFill: jest.fn(() => ({
-        setSolidFill: jest.fn((color) => {
+      getFill: this.mockFn(() => ({
+        setSolidFill: this.mockFn((color) => {
           fillColor = color;
           return this;
         }),
-        getSolidFill: jest.fn(() => ({
+        getSolidFill: this.mockFn(() => ({
           getColor: () => fillColor
         }))
       })),
       
-      getBorder: jest.fn(() => ({
-        setDashStyle: jest.fn(() => this),
-        setTransparency: jest.fn(() => this),
-        setWeight: jest.fn((weight) => {
+      getBorder: this.mockFn(() => ({
+        setDashStyle: this.mockFn(() => this),
+        setTransparency: this.mockFn(() => this),
+        setWeight: this.mockFn((weight) => {
           borderWidth = weight;
           return this;
         }),
         getWeight: () => borderWidth
       })),
       
-      setLeft: jest.fn((newLeft) => { 
+      setLeft: this.mockFn((newLeft) => { 
         position.left = newLeft;
         return this;
       }),
-      setTop: jest.fn((newTop) => { 
+      setTop: this.mockFn((newTop) => { 
         position.top = newTop;
         return this;
       }),
-      setWidth: jest.fn((newWidth) => { 
+      setWidth: this.mockFn((newWidth) => { 
         position.width = newWidth;
         return this;
       }),
-      setHeight: jest.fn((newHeight) => { 
+      setHeight: this.mockFn((newHeight) => { 
         position.height = newHeight;
         return this;
       }),
@@ -354,7 +401,7 @@ class EnhancedGASMocks {
       getWidth: () => position.width,
       getHeight: () => position.height,
       
-      remove: jest.fn(() => {
+      remove: this.mockFn(() => {
         return true;
       })
     };
@@ -364,14 +411,14 @@ class EnhancedGASMocks {
     const self = this;
     
     global.DriveApp = {
-      createFile: jest.fn((name, content, mimeType) => {
+      createFile: this.mockFn((name, content, mimeType) => {
         const id = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const file = self.createMockFile(id, name, content, mimeType);
         self.files.set(id, file);
         return file;
       }),
       
-      getFileById: jest.fn((id) => {
+      getFileById: this.mockFn((id) => {
         const file = self.files.get(id);
         if (!file) {
           throw new Error(`File not found: ${id}`);
@@ -379,12 +426,12 @@ class EnhancedGASMocks {
         return file;
       }),
       
-      getFiles: jest.fn(() => ({
+      getFiles: this.mockFn(() => ({
         hasNext: () => self.files.size > 0,
         next: () => Array.from(self.files.values())[0]
       })),
       
-      getFolderById: jest.fn((id) => ({
+      getFolderById: this.mockFn((id) => ({
         getId: () => id,
         getName: () => 'Mock Folder',
         getFiles: () => global.DriveApp.getFiles()
@@ -401,15 +448,15 @@ class EnhancedGASMocks {
     return {
       getId: () => id,
       getName: () => currentName,
-      setName: jest.fn((newName) => {
+      setName: this.mockFn((newName) => {
         currentName = newName;
         return this;
       }),
       
-      getBlob: jest.fn(() => ({
+      getBlob: this.mockFn(() => ({
         getBytes: () => new Uint8Array(Buffer.from(currentContent)),
         getContentType: () => mimeType || 'text/plain',
-        setContentType: jest.fn((type) => {
+        setContentType: this.mockFn((type) => {
           mimeType = type;
           return this;
         })
@@ -417,7 +464,7 @@ class EnhancedGASMocks {
       
       getContentType: () => mimeType || 'text/plain',
       
-      setTrashed: jest.fn((shouldTrash) => {
+      setTrashed: this.mockFn((shouldTrash) => {
         trashed = shouldTrash;
         if (trashed) {
           self.files.delete(id);
@@ -427,11 +474,11 @@ class EnhancedGASMocks {
       
       isTrashed: () => trashed,
       
-      getUrl: jest.fn(() => `https://drive.google.com/file/d/${id}/view`),
+      getUrl: this.mockFn(() => `https://drive.google.com/file/d/${id}/view`),
       
-      getDownloadUrl: jest.fn(() => `https://drive.google.com/uc?id=${id}&export=download`),
+      getDownloadUrl: this.mockFn(() => `https://drive.google.com/uc?id=${id}&export=download`),
       
-      makeCopy: jest.fn((newName) => {
+      makeCopy: this.mockFn((newName) => {
         const copyId = `file-${Date.now()}-copy`;
         const copy = self.createMockFile(copyId, newName || `Copy of ${currentName}`, currentContent, mimeType);
         self.files.set(copyId, copy);
@@ -442,34 +489,34 @@ class EnhancedGASMocks {
   
   setupUtilitiesMock() {
     global.Utilities = {
-      sleep: jest.fn((milliseconds) => {
+      sleep: this.mockFn((milliseconds) => {
         // Mock sleep - in real tests, this would pause execution
         return;
       }),
       
-      base64Encode: jest.fn((data) => {
+      base64Encode: this.mockFn((data) => {
         if (typeof data === 'string') {
           return Buffer.from(data).toString('base64');
         }
         return Buffer.from(data).toString('base64');
       }),
       
-      base64Decode: jest.fn((encoded) => {
+      base64Decode: this.mockFn((encoded) => {
         return Buffer.from(encoded, 'base64').toString();
       }),
       
-      formatDate: jest.fn((date, timeZone, format) => {
+      formatDate: this.mockFn((date, timeZone, format) => {
         if (!date) {
           return '';
         }
         return date.toISOString();
       }),
       
-      formatString: jest.fn((template, ...args) => {
+      formatString: this.mockFn((template, ...args) => {
         return template.replace(/%s/g, () => args.shift() || '');
       }),
       
-      getUuid: jest.fn(() => {
+      getUuid: this.mockFn(() => {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
           const r = Math.random() * 16 | 0;
           const v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -477,11 +524,11 @@ class EnhancedGASMocks {
         });
       }),
       
-      jsonParse: jest.fn((jsonString) => {
+      jsonParse: this.mockFn((jsonString) => {
         return JSON.parse(jsonString);
       }),
       
-      jsonStringify: jest.fn((object) => {
+      jsonStringify: this.mockFn((object) => {
         return JSON.stringify(object);
       })
     };
@@ -492,17 +539,17 @@ class EnhancedGASMocks {
     
     global.PropertiesService = {
       getScriptProperties: () => ({
-        getProperty: jest.fn((key) => self.properties.get(key)),
-        setProperty: jest.fn((key, value) => {
+        getProperty: this.mockFn((key) => self.properties.get(key)),
+        setProperty: this.mockFn((key, value) => {
           self.properties.set(key, value);
           return this;
         }),
-        getProperties: jest.fn(() => Object.fromEntries(self.properties)),
-        deleteProperty: jest.fn((key) => {
+        getProperties: this.mockFn(() => Object.fromEntries(self.properties)),
+        deleteProperty: this.mockFn((key) => {
           self.properties.delete(key);
           return this;
         }),
-        setProperties: jest.fn((properties) => {
+        setProperties: this.mockFn((properties) => {
           Object.entries(properties).forEach(([key, value]) => {
             self.properties.set(key, value);
           });
@@ -511,12 +558,12 @@ class EnhancedGASMocks {
       }),
       
       getUserProperties: () => ({
-        getProperty: jest.fn((key) => self.properties.get(`user_${key}`)),
-        setProperty: jest.fn((key, value) => {
+        getProperty: this.mockFn((key) => self.properties.get(`user_${key}`)),
+        setProperty: this.mockFn((key, value) => {
           self.properties.set(`user_${key}`, value);
           return this;
         }),
-        getProperties: jest.fn(() => {
+        getProperties: this.mockFn(() => {
           const userProps = {};
           self.properties.forEach((value, key) => {
             if (key.startsWith('user_')) {
@@ -525,7 +572,7 @@ class EnhancedGASMocks {
           });
           return userProps;
         }),
-        deleteProperty: jest.fn((key) => {
+        deleteProperty: this.mockFn((key) => {
           self.properties.delete(`user_${key}`);
           return this;
         })
@@ -535,7 +582,7 @@ class EnhancedGASMocks {
   
   setupUrlFetchAppMock() {
     global.UrlFetchApp = {
-      fetch: jest.fn((url, params = {}) => {
+      fetch: this.mockFn((url, params = {}) => {
         // Mock different URL responses
         let responseContent = '{"status": "success"}';
         let responseCode = 200;
@@ -549,18 +596,18 @@ class EnhancedGASMocks {
         }
         
         return {
-          getContentText: jest.fn(() => responseContent),
-          getResponseCode: jest.fn(() => responseCode),
-          getHeaders: jest.fn(() => ({
+          getContentText: this.mockFn(() => responseContent),
+          getResponseCode: this.mockFn(() => responseCode),
+          getHeaders: this.mockFn(() => ({
             'Content-Type': 'application/json'
           })),
-          getBlob: jest.fn(() => ({
+          getBlob: this.mockFn(() => ({
             getBytes: () => new Uint8Array(Buffer.from(responseContent))
           }))
         };
       }),
       
-      fetchAll: jest.fn((requests) => {
+      fetchAll: this.mockFn((requests) => {
         return requests.map(request => 
           global.UrlFetchApp.fetch(request.url || request, request.params));
       })
@@ -569,28 +616,28 @@ class EnhancedGASMocks {
   
   setupHtmlServiceMock() {
     global.HtmlService = {
-      createHtmlOutput: jest.fn((html) => ({
-        setTitle: jest.fn((title) => this),
-        setWidth: jest.fn((width) => this),
-        setHeight: jest.fn((height) => this),
-        getContent: jest.fn(() => html || ''),
-        append: jest.fn((content) => {
+      createHtmlOutput: this.mockFn((html) => ({
+        setTitle: this.mockFn((title) => this),
+        setWidth: this.mockFn((width) => this),
+        setHeight: this.mockFn((height) => this),
+        getContent: this.mockFn(() => html || ''),
+        append: this.mockFn((content) => {
           html += content;
           return this;
         })
       })),
       
-      createHtmlOutputFromFile: jest.fn((filename) => ({
-        setTitle: jest.fn((title) => this),
-        setWidth: jest.fn((width) => this),
-        setHeight: jest.fn((height) => this),
-        getContent: jest.fn(() => `<html><body>Mock content from ${filename}</body></html>`)
+      createHtmlOutputFromFile: this.mockFn((filename) => ({
+        setTitle: this.mockFn((title) => this),
+        setWidth: this.mockFn((width) => this),
+        setHeight: this.mockFn((height) => this),
+        getContent: this.mockFn(() => `<html><body>Mock content from ${filename}</body></html>`)
       })),
       
-      createTemplate: jest.fn((html) => ({
-        evaluate: jest.fn(() => global.HtmlService.createHtmlOutput(html)),
-        getCode: jest.fn(() => html || ''),
-        getRawContent: jest.fn(() => html || '')
+      createTemplate: this.mockFn((html) => ({
+        evaluate: this.mockFn(() => global.HtmlService.createHtmlOutput(html)),
+        getCode: this.mockFn(() => html || ''),
+        getRawContent: this.mockFn(() => html || '')
       }))
     };
   }
@@ -599,7 +646,7 @@ class EnhancedGASMocks {
     const self = this;
     
     global.Logger = {
-      log: jest.fn((message, ...args) => {
+      log: this.mockFn((message, ...args) => {
         const logEntry = {
           message,
           args,
@@ -609,11 +656,11 @@ class EnhancedGASMocks {
         console.log(`[GAS Logger] ${message}`, ...args);
       }),
       
-      clear: jest.fn(() => {
+      clear: this.mockFn(() => {
         self.logs = [];
       }),
       
-      getLog: jest.fn(() => {
+      getLog: this.mockFn(() => {
         return self.logs.map(entry => 
           `${entry.timestamp}: ${entry.message} ${entry.args.join(' ')}`).join('\n');
       })
@@ -672,7 +719,7 @@ class EnhancedGASMocks {
     const originalCreate = global.SlidesApp.create;
     let callCount = 0;
     
-    global.SlidesApp.create = jest.fn((title) => {
+    global.SlidesApp.create = this.mockFn((title) => {
       callCount++;
       if (callCount <= 2) {
         throw new Error('Rate limit exceeded');
@@ -688,7 +735,7 @@ class EnhancedGASMocks {
   simulateNetworkError() {
     const originalFetch = global.UrlFetchApp.fetch;
     
-    global.UrlFetchApp.fetch = jest.fn(() => {
+    global.UrlFetchApp.fetch = this.mockFn(() => {
       throw new Error('Network timeout');
     });
     
@@ -700,7 +747,7 @@ class EnhancedGASMocks {
   simulateQuotaExceeded() {
     const originalCreate = global.SlidesApp.create;
     
-    global.SlidesApp.create = jest.fn(() => {
+    global.SlidesApp.create = this.mockFn(() => {
       throw new Error('Quota exceeded');
     });
     

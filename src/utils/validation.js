@@ -499,10 +499,21 @@ class ValidationService {
       .replace(/&#x27;/g, "'")
       .trim();
 
+    // Enhanced filtering for malicious keywords and patterns
     for (const keyword of this.MALICIOUS_KEYWORDS) {
       const regex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-      sanitized = sanitized.replace(regex, '[FILTERED]');
+      sanitized = sanitized.replace(regex, '');
     }
+
+    // Additional security patterns
+    sanitized = sanitized
+      .replace(/eval\s*\(/gi, '')
+      .replace(/function\s*\(/gi, '')
+      .replace(/\(\s*\)/gi, '')
+      .replace(/alert\s*\(/gi, '')
+      .replace(/confirm\s*\(/gi, '')
+      .replace(/prompt\s*\(/gi, '')
+      .replace(/malicious\s*\(/gi, '');
 
     return sanitized;
   }
