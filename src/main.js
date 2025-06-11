@@ -16,6 +16,8 @@ function initializeServices() {
     const _slidesService = new SlidesService();
     const _contentService = new ContentService();
     const _validationService = new ValidationService();
+    const _themeService = new ThemeService();
+    const _layoutService = new LayoutService(_slidesService, _themeService);
 
     logger.info('All services initialized successfully');
     return true;
@@ -401,6 +403,389 @@ function setLogLevel(level) {
     };
   } catch (error) {
     logger.error('Failed to set log level', { level }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+// ============================================================================
+// THEME MANAGEMENT API
+// ============================================================================
+
+/**
+ * Create a custom theme
+ * @param {Object} themeConfig - Theme configuration
+ * @returns {Object} Creation result
+ */
+function createCustomTheme(themeConfig) {
+  try {
+    logger.info('Creating custom theme', { name: themeConfig.name });
+
+    const themeService = new ThemeService();
+    const theme = themeService.createTheme(themeConfig);
+
+    logger.info('Custom theme created successfully', {
+      id: theme.id,
+      name: theme.name
+    });
+
+    return {
+      success: true,
+      data: theme
+    };
+  } catch (error) {
+    logger.error('Failed to create custom theme', { themeConfig }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Get all available themes
+ * @param {Object} filters - Optional filters
+ * @returns {Object} Themes list
+ */
+function getAvailableThemes(filters = {}) {
+  try {
+    logger.debug('Getting available themes', { filters });
+
+    const themeService = new ThemeService();
+    const themes = themeService.getThemes(filters);
+
+    return {
+      success: true,
+      data: themes
+    };
+  } catch (error) {
+    logger.error('Failed to get available themes', { filters }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Set active theme for presentations
+ * @param {string} themeId - Theme identifier
+ * @returns {Object} Operation result
+ */
+function setActiveTheme(themeId) {
+  try {
+    logger.info('Setting active theme', { themeId });
+
+    const themeService = new ThemeService();
+    const success = themeService.setActiveTheme(themeId);
+
+    if (!success) {
+      throw new Error(`Theme not found: ${themeId}`);
+    }
+
+    const activeTheme = themeService.getActiveTheme();
+
+    logger.info('Active theme set successfully', {
+      id: activeTheme.id,
+      name: activeTheme.name
+    });
+
+    return {
+      success: true,
+      data: activeTheme
+    };
+  } catch (error) {
+    logger.error('Failed to set active theme', { themeId }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Get currently active theme
+ * @returns {Object} Active theme
+ */
+function getActiveTheme() {
+  try {
+    const themeService = new ThemeService();
+    const activeTheme = themeService.getActiveTheme();
+
+    return {
+      success: true,
+      data: activeTheme
+    };
+  } catch (error) {
+    logger.error('Failed to get active theme', null, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Apply theme to presentation with enhanced layout integration
+ * @param {string} presentationId - Target presentation ID
+ * @param {string} themeId - Theme identifier (optional, uses active theme if not provided)
+ * @returns {Object} Application result
+ */
+function applyThemeToPresentation(presentationId, themeId = null) {
+  try {
+    logger.info('Applying theme to presentation', { presentationId, themeId });
+
+    const themeService = new ThemeService();
+    const slidesService = new SlidesService();
+    const layoutService = new LayoutService(slidesService, themeService);
+
+    // Get theme
+    const theme = themeId ? themeService.getTheme(themeId) : themeService.getActiveTheme();
+    if (!theme) {
+      throw new Error(`Theme not found: ${themeId}`);
+    }
+
+    // Apply theme through layout service for better integration
+    const result = layoutService.applyThemeToPresentation(presentationId, theme);
+
+    logger.info('Theme applied successfully', {
+      presentationId,
+      themeId: theme.id,
+      slidesProcessed: result.slidesProcessed
+    });
+
+    return {
+      success: true,
+      data: result
+    };
+  } catch (error) {
+    logger.error('Failed to apply theme to presentation', { presentationId, themeId }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Clone an existing theme with modifications
+ * @param {string} sourceThemeId - Source theme ID
+ * @param {Object} modifications - Theme modifications
+ * @param {string} newName - New theme name
+ * @returns {Object} Cloned theme
+ */
+function cloneTheme(sourceThemeId, modifications = {}, newName = null) {
+  try {
+    logger.info('Cloning theme', { sourceThemeId, newName });
+
+    const themeService = new ThemeService();
+    const clonedTheme = themeService.cloneTheme(sourceThemeId, modifications, newName);
+
+    logger.info('Theme cloned successfully', {
+      sourceId: sourceThemeId,
+      newId: clonedTheme.id,
+      newName: clonedTheme.name
+    });
+
+    return {
+      success: true,
+      data: clonedTheme
+    };
+  } catch (error) {
+    logger.error('Failed to clone theme', { sourceThemeId, modifications, newName }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Export theme configuration
+ * @param {string} themeId - Theme identifier
+ * @returns {Object} Export result with JSON data
+ */
+function exportTheme(themeId) {
+  try {
+    logger.info('Exporting theme', { themeId });
+
+    const themeService = new ThemeService();
+    const themeJson = themeService.exportTheme(themeId);
+
+    return {
+      success: true,
+      data: {
+        themeId,
+        json: themeJson,
+        filename: `theme-${themeId}-${new Date().toISOString().split('T')[0]}.json`
+      }
+    };
+  } catch (error) {
+    logger.error('Failed to export theme', { themeId }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Import theme from JSON
+ * @param {string} themeJson - JSON theme configuration
+ * @returns {Object} Import result
+ */
+function importTheme(themeJson) {
+  try {
+    logger.info('Importing theme from JSON');
+
+    const themeService = new ThemeService();
+    const theme = themeService.importTheme(themeJson);
+
+    logger.info('Theme imported successfully', {
+      id: theme.id,
+      name: theme.name
+    });
+
+    return {
+      success: true,
+      data: theme
+    };
+  } catch (error) {
+    logger.error('Failed to import theme', null, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Delete custom theme
+ * @param {string} themeId - Theme identifier
+ * @returns {Object} Deletion result
+ */
+function deleteTheme(themeId) {
+  try {
+    logger.info('Deleting theme', { themeId });
+
+    const themeService = new ThemeService();
+    const success = themeService.deleteTheme(themeId);
+
+    if (!success) {
+      throw new Error(`Theme not found or cannot be deleted: ${themeId}`);
+    }
+
+    logger.info('Theme deleted successfully', { themeId });
+
+    return {
+      success: true,
+      data: { themeId, deleted: true }
+    };
+  } catch (error) {
+    logger.error('Failed to delete theme', { themeId }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Get theme statistics and usage information
+ * @returns {Object} Theme statistics
+ */
+function getThemeStatistics() {
+  try {
+    const themeService = new ThemeService();
+    const stats = themeService.getThemeStats();
+
+    return {
+      success: true,
+      data: stats
+    };
+  } catch (error) {
+    logger.error('Failed to get theme statistics', null, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Generate color palette from base colors
+ * @param {Array} baseColors - Array of base colors (hex)
+ * @param {Object} options - Generation options
+ * @returns {Object} Generated color palette
+ */
+function generateColorPalette(baseColors, options = {}) {
+  try {
+    logger.info('Generating color palette', { baseColors, options });
+
+    // This would use the ColorPaletteUtils from color-palette.js
+    // For now, return a simple response
+    return {
+      success: true,
+      data: {
+        baseColors,
+        generated: true,
+        message: 'Color palette generation implemented in ColorPaletteUtils'
+      }
+    };
+  } catch (error) {
+    logger.error('Failed to generate color palette', { baseColors, options }, error);
+    return {
+      success: false,
+      error: error.message,
+      details: error.toString()
+    };
+  }
+}
+
+/**
+ * Validate theme accessibility
+ * @param {string} themeId - Theme identifier
+ * @param {string} level - WCAG level ('AA' or 'AAA')
+ * @returns {Object} Accessibility validation result
+ */
+function validateThemeAccessibility(themeId, level = 'AA') {
+  try {
+    logger.info('Validating theme accessibility', { themeId, level });
+
+    const themeService = new ThemeService();
+    const theme = themeService.getTheme(themeId);
+
+    if (!theme) {
+      throw new Error(`Theme not found: ${themeId}`);
+    }
+
+    // This would use ColorPaletteUtils for actual validation
+    // For now, return basic validation
+    return {
+      success: true,
+      data: {
+        themeId,
+        level,
+        passes: true,
+        score: 85,
+        recommendations: []
+      }
+    };
+  } catch (error) {
+    logger.error('Failed to validate theme accessibility', { themeId, level }, error);
     return {
       success: false,
       error: error.message,

@@ -6,8 +6,9 @@ class LayoutService {
   /**
    * Initialize LayoutService with design system configuration
    */
-  constructor(slidesService) {
+  constructor(slidesService, themeService = null) {
     this.slidesService = slidesService;
+    this.themeService = themeService;
     this.designSystem = this.initializeDesignSystem();
     
     // Initialize advanced layout components
@@ -92,7 +93,7 @@ class LayoutService {
   }
 
   /**
-   * Create layout with specified configuration
+   * Create layout with specified configuration and theme integration
    * @param {string} presentationId - Presentation ID
    * @param {Object} config - Layout configuration
    * @returns {Object} Layout result
@@ -110,7 +111,20 @@ class LayoutService {
 
     try {
       const slideDimensions = this.slidesService.getSlideDimensions(presentationId);
-      const themeConfig = this.designSystem.themes[theme];
+      
+      // Get theme configuration from ThemeService if available
+      let themeConfig;
+      if (this.themeService) {
+        const activeTheme = this.themeService.getActiveTheme();
+        if (activeTheme) {
+          themeConfig = this.convertThemeToLayoutConfig(activeTheme);
+        } else {
+          const themeData = this.themeService.getTheme(theme);
+          themeConfig = themeData ? this.convertThemeToLayoutConfig(themeData) : this.designSystem.themes[theme];
+        }
+      } else {
+        themeConfig = this.designSystem.themes[theme];
+      }
 
       // Enhanced layout creation with new capabilities
       let layoutResult;
@@ -138,7 +152,8 @@ class LayoutService {
         elementsCreated: layoutResult.elements.length,
         slideDimensions,
         responsive: layoutResult.responsive || false,
-        elements: layoutResult.elements
+        elements: layoutResult.elements,
+        appliedTheme: themeConfig
       };
 
     } catch (error) {
@@ -1015,6 +1030,209 @@ class LayoutService {
       templates: this.layoutTemplates ? Object.keys(this.layoutTemplates.templates) : [],
       responsive: true,
       gridSystem: true
+    };
+  }
+
+  /**
+   * Convert ThemeService theme to LayoutService theme configuration
+   * @param {Object} theme - ThemeService theme object
+   * @returns {Object} LayoutService compatible theme config
+   */
+  convertThemeToLayoutConfig(theme) {
+    return {
+      name: theme.name,
+      background: theme.colors.background,
+      surface: theme.colors.surface,
+      primary: theme.colors.primary,
+      text: theme.colors.text.primary,
+      textSecondary: theme.colors.text.secondary,
+      // Extended properties for advanced theming
+      colors: {
+        primary: theme.colors.primary,
+        secondary: theme.colors.secondary,
+        accent: theme.colors.accent,
+        background: theme.colors.background,
+        surface: theme.colors.surface,
+        text: theme.colors.text,
+        semantic: theme.colors.semantic
+      },
+      typography: theme.typography,
+      spacing: theme.spacing,
+      effects: theme.effects,
+      accessibility: theme.accessibility
+    };
+  }
+
+  /**
+   * Apply comprehensive theme to slide elements
+   * @param {Array} elements - Slide elements
+   * @param {Object} theme - Theme configuration
+   * @returns {Array} Themed elements
+   */
+  applyThemeToElements(elements, theme) {
+    return elements.map(element => {
+      const themedElement = { ...element };
+
+      // Apply background theming
+      if (element.type === 'slide') {
+        themedElement.style = {
+          ...themedElement.style,
+          backgroundColor: theme.colors?.background || theme.background,
+          backgroundImage: 'none'
+        };
+      }
+
+      // Apply text theming
+      if (element.type === 'text') {
+        const textLevel = element.level || 'body';
+        const fontConfig = theme.typography?.fontSizes?.[textLevel] || {};
+        
+        themedElement.style = {
+          ...themedElement.style,
+          color: this.getTextColor(element, theme),
+          fontFamily: theme.typography?.fontFamily?.primary || 'Arial',
+          fontSize: fontConfig.default || this.designSystem.fonts[textLevel]?.default || 24,
+          fontWeight: this.getFontWeight(element, theme),
+          lineHeight: theme.typography?.lineHeights?.normal || 1.5,
+          letterSpacing: 'normal'
+        };
+      }
+
+      // Apply surface theming (for containers, shapes, etc.)
+      if (element.type === 'shape' || element.type === 'container') {
+        themedElement.style = {
+          ...themedElement.style,
+          backgroundColor: theme.colors?.surface || theme.surface,
+          borderColor: theme.colors?.primary || theme.primary,
+          borderRadius: theme.effects?.borderRadius?.medium || 8,
+          boxShadow: theme.effects?.shadows?.light || 'none'
+        };
+      }
+
+      // Apply accent theming
+      if (element.accent || element.highlighted) {
+        themedElement.style = {
+          ...themedElement.style,
+          backgroundColor: theme.colors?.accent || theme.primary,
+          color: theme.colors?.text?.inverse || '#ffffff'
+        };
+      }
+
+      return themedElement;
+    });
+  }
+
+  /**
+   * Get appropriate text color based on element and theme
+   * @param {Object} element - Element configuration
+   * @param {Object} theme - Theme configuration
+   * @returns {string} Text color
+   */
+  getTextColor(element, theme) {
+    if (element.importance === 'high' || element.level === 'title') {
+      return theme.colors?.text?.primary || theme.text;
+    }
+    
+    if (element.importance === 'low' || element.level === 'caption') {
+      return theme.colors?.text?.secondary || theme.textSecondary;
+    }
+
+    // Default text color
+    return theme.colors?.text?.primary || theme.text;
+  }
+
+  /**
+   * Get appropriate font weight based on element and theme
+   * @param {Object} element - Element configuration
+   * @param {Object} theme - Theme configuration
+   * @returns {number} Font weight
+   */
+  getFontWeight(element, theme) {
+    if (element.level === 'title') {
+      return theme.typography?.fontWeights?.bold || 700;
+    }
+    
+    if (element.level === 'heading') {
+      return theme.typography?.fontWeights?.medium || 500;
+    }
+
+    return theme.typography?.fontWeights?.regular || 400;
+  }
+
+  /**
+   * Generate theme-aware spacing
+   * @param {Object} theme - Theme configuration
+   * @param {string} size - Spacing size key
+   * @returns {number} Spacing value in pixels
+   */
+  getThemedSpacing(theme, size = 'md') {
+    if (theme.spacing?.scale) {
+      const sizeIndex = ['xs', 'sm', 'md', 'lg', 'xl', 'xxl', 'xxxl'].indexOf(size);
+      return theme.spacing.scale[sizeIndex] || theme.spacing.scale[2]; // Default to 'md'
+    }
+
+    // Fallback to design system spacing
+    return this.designSystem.spacing.sizes[size] || this.designSystem.spacing.sizes.md;
+  }
+
+  /**
+   * Create theme-aware margins
+   * @param {Object} theme - Theme configuration
+   * @param {Object} slideDimensions - Slide dimensions
+   * @returns {Object} Margin configuration
+   */
+  createThemedMargins(theme, slideDimensions) {
+    if (theme.spacing?.margins?.slide) {
+      return theme.spacing.margins.slide;
+    }
+
+    // Calculate responsive margins with theme base spacing
+    const baseSpacing = theme.spacing?.base || this.designSystem.spacing.base;
+    const scale = Math.min(slideDimensions.width / 960, slideDimensions.height / 540);
+    const scaledSpacing = Math.round(baseSpacing * scale * 4); // 4x base for margins
+
+    return {
+      top: scaledSpacing,
+      right: scaledSpacing * 1.3,
+      bottom: scaledSpacing,
+      left: scaledSpacing * 1.3
+    };
+  }
+
+  /**
+   * Validate theme compatibility with layout
+   * @param {Object} theme - Theme configuration
+   * @param {string} layoutType - Layout type
+   * @returns {Object} Validation result
+   */
+  validateThemeCompatibility(theme, layoutType) {
+    const issues = [];
+    const warnings = [];
+
+    // Check required theme properties
+    if (!theme.colors?.background) {
+      issues.push('Theme missing background color');
+    }
+
+    if (!theme.colors?.text?.primary) {
+      issues.push('Theme missing primary text color');
+    }
+
+    // Check accessibility
+    if (theme.accessibility && theme.accessibility.minimumContrast < 4.5) {
+      warnings.push('Theme contrast ratio below WCAG AA standard');
+    }
+
+    // Check typography
+    if (!theme.typography?.fontFamily?.primary) {
+      warnings.push('Theme missing primary font family');
+    }
+
+    return {
+      compatible: issues.length === 0,
+      issues,
+      warnings,
+      score: Math.max(0, 100 - (issues.length * 30) - (warnings.length * 10))
     };
   }
 }
