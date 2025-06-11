@@ -1,0 +1,408 @@
+# Google Slides Content Generator - Task Management
+# Claude Code + Git Worktree統合タスク管理システム
+
+project:
+  name: "Google Slides Content Generator"
+  version: "1.0.0"
+  repository: "https://github.com/knishioka/slide-maker"
+
+workflow:
+  # Claude Code起動前ワークフロー
+  pre_claude:
+    - select_task: "利用可能なタスクから選択"
+    - create_worktree: "選択されたタスクのworktreeを作成"
+    - update_status: "タスクステータスをIN_PROGRESSに更新"
+    - commit_status: "ステータス更新をmain branchにcommit"
+    - navigate_worktree: "worktreeディレクトリに移動"
+    - launch_claude: "claude-code --dangerously-skip-permissions で起動"
+
+  # Claude Code セッション中
+  claude_session:
+    - provide_context: "タスク詳細とクローデ開始メッセージを提供"
+    - development: "実装・テスト・ドキュメント作成"
+    - quality_check: "lint・test実行"
+    - commit_work: "作業内容をcommit"
+
+  # セッション完了後
+  post_claude:
+    - merge_to_main: "mainブランチにマージ"
+    - update_completion: "タスクステータスをDONEに更新"
+    - cleanup_worktree: "worktreeを削除"
+    - commit_completion: "完了ステータスをcommit"
+
+tasks:
+  # 高優先度タスク
+  - id: "TASK-002"
+    title: "Theme Management System"
+    priority: "high"
+    estimate_days: 3
+    status: "todo"
+    category: "layout-design"
+    dependencies: ["TASK-001"]
+    assignee: null
+    worktree: null
+    branch: null
+    started_date: null
+    completed_date: null
+    description: "Custom themes, color palettes, font management system"
+    claude_context: |
+      ## 🎨 タスク: Theme Management System
+
+      ### 📋 実装目標
+      - カスタムテーマシステムの構築
+      - カラーパレット管理機能
+      - フォント管理システム
+      - テーマ切り替え機能
+
+      ### 🔧 技術要件
+      - 既存のLayoutServiceとの統合
+      - テーマのプリセット機能
+      - ユーザーカスタムテーマ保存
+      - アクセシビリティ準拠のカラーコントラスト
+
+      ### 📁 主要作業ファイル
+      - `src/services/themeService.js` (新規)
+      - `src/utils/colorUtils.js` (新規)
+      - `src/services/layout.js` (拡張)
+      - `tests/unit/themeService.test.js` (新規)
+
+      ### ✅ 完了条件
+      - テーマシステムの実装完了
+      - ユニットテスト カバレッジ90%以上
+      - 統合テスト実装
+      - ドキュメント更新
+
+      既存のLayoutServiceに依存するため、TASK-001の成果物を活用してください。
+    technical_notes:
+      - "TASK-001のLayoutServiceとの統合必須"
+      - "カラーアクセシビリティ検証機能含む"
+      - "テーマプリセット: default, corporate, presentation, creative"
+    acceptance_criteria:
+      - "テーマ切り替えが即座に反映される"
+      - "カスタムカラーパレット作成可能"
+      - "WCAG AA準拠のコントラスト比自動検証"
+      - "レスポンシブデザインでテーマ適用"
+
+  - id: "TASK-003"
+    title: "Advanced Mermaid Integration"
+    priority: "medium"
+    estimate_days: 4
+    status: "todo"
+    category: "content-enhancement"
+    dependencies: ["Content Service"]
+    assignee: null
+    worktree: null
+    branch: null
+    started_date: null
+    completed_date: null
+    description: "Interactive diagrams, custom styling, export options"
+    claude_context: |
+      ## 📊 タスク: Advanced Mermaid Integration
+
+      ### 📋 実装目標
+      - インタラクティブMermaid図の実装
+      - カスタムスタイリング機能
+      - 多様な図表タイプサポート
+      - エクスポート機能強化
+
+      ### 🔧 技術要件
+      - Mermaid.js最新版との統合
+      - Google Slides APIでの図表挿入
+      - SVG → 画像変換機能
+      - リアルタイムプレビュー
+
+      ### 📁 主要作業ファイル
+      - `src/services/mermaidService.js` (新規)
+      - `src/utils/svgConverter.js` (新規)
+      - `src/services/content.js` (拡張)
+      - `tests/integration/mermaid-integration.test.js` (新規)
+
+      ### ✅ 完了条件
+      - 各種図表タイプ対応 (flowchart, sequence, gantt, class, state)
+      - カスタムテーマとの連携
+      - 高品質な画像出力
+      - パフォーマンス最適化
+    technical_notes:
+      - "Mermaid.js v10.x系を使用"
+      - "Google Slides API画像挿入制限に注意"
+      - "SVG → PNG変換でのフォント埋め込み対応"
+    acceptance_criteria:
+      - "複雑な図表が正確にレンダリングされる"
+      - "カスタムテーマが図表に適用される"
+      - "大きな図表でもパフォーマンス劣化なし"
+      - "エラーハンドリング充実"
+
+  - id: "TASK-004"
+    title: "Chart & Graph Generator"
+    priority: "medium"
+    estimate_days: 6
+    status: "todo"
+    category: "content-enhancement"
+    dependencies: ["Content Service"]
+    assignee: null
+    worktree: null
+    branch: null
+    started_date: null
+    completed_date: null
+    description: "Dynamic charts from data, multiple chart types"
+    claude_context: |
+      ## 📈 タスク: Chart & Graph Generator
+
+      ### 📋 実装目標
+      - データドリブンなグラフ生成
+      - 多様なチャートタイプ対応
+      - 動的データソース連携
+      - 美しいビジュアライゼーション
+
+      ### 🔧 技術要件
+      - Chart.js または D3.js活用
+      - Google Sheets連携
+      - CSV/JSONデータ対応
+      - インタラクティブ要素
+
+      ### 📁 主要作業ファイル
+      - `src/services/chartService.js` (新規)
+      - `src/utils/dataProcessor.js` (新規)
+      - `src/services/dataSourceConnector.js` (新規)
+      - `tests/unit/chartService.test.js` (新規)
+
+      ### ✅ 完了条件
+      - 基本チャート: bar, line, pie, scatter, area
+      - 高度なチャート: heatmap, treemap, sankey
+      - データソース自動更新
+      - アニメーション効果
+
+      データの可視化に重点を置き、直感的で美しいチャートを作成してください。
+    technical_notes:
+      - "Chart.js v4.x推奨 (軽量性とパフォーマンス)"
+      - "Google Sheets API v4使用"
+      - "大データセット対応のページネーション"
+    acceptance_criteria:
+      - "10,000データポイントでも高速描画"
+      - "リアルタイムデータ更新対応"
+      - "カスタムカラーパレット適用"
+      - "チャート種別の動的切り替え"
+
+  - id: "TASK-005"
+    title: "RESTful API Development"
+    priority: "high"
+    estimate_days: 7
+    status: "todo"
+    category: "api-integration"
+    dependencies: ["Core Services"]
+    assignee: null
+    worktree: null
+    branch: null
+    started_date: null
+    completed_date: null
+    description: "HTTP endpoints, authentication, rate limiting"
+    claude_context: |
+      ## 🔌 タスク: RESTful API Development
+
+      ### 📋 実装目標
+      - RESTful API エンドポイント設計・実装
+      - 認証・認可システム
+      - レート制限機能
+      - API Documentation自動生成
+
+      ### 🔧 技術要件
+      - Google Apps Script Web App
+      - OAuth 2.0認証
+      - OpenAPI仕様準拠
+      - JSON API標準
+
+      ### 📁 主要作業ファイル
+      - `src/api/` (新規ディレクトリ)
+      - `src/api/routes/slides.js` (新規)
+      - `src/api/middleware/auth.js` (新規)
+      - `src/api/middleware/rateLimit.js` (新規)
+      - `docs/api-specification.yaml` (新規)
+
+      ### ✅ 完了条件
+      - CRUD操作エンドポイント完備
+      - セキュアな認証システム
+      - 包括的なAPI文書
+      - レート制限とエラーハンドリング
+
+      Google Apps ScriptのWeb App機能を活用して、スケーラブルなAPIを設計してください。
+    technical_notes:
+      - "Google Apps Script doGet/doPost制約考慮"
+      - "CORS設定とクロスオリジン対応"
+      - "Google Cloud Loggingとの統合"
+    acceptance_criteria:
+      - "APIレスポンス時間 < 2秒"
+      - "認証失敗率 < 0.1%"
+      - "99.9%以上のアップタイム"
+      - "OpenAPI 3.0準拠の文書"
+
+  - id: "TASK-006"
+    title: "External Data Sources Integration"
+    priority: "medium"
+    estimate_days: 5
+    status: "todo"
+    category: "api-integration"
+    dependencies: ["TASK-005"]
+    assignee: null
+    worktree: null
+    branch: null
+    started_date: null
+    completed_date: null
+    description: "Google Sheets, CSV, JSON data import"
+    claude_context: |
+      ## 🔗 タスク: External Data Sources Integration
+
+      ### 📋 実装目標
+      - 多様なデータソース統合
+      - リアルタイムデータ同期
+      - データ変換・正規化機能
+      - キャッシュ戦略実装
+
+      ### 🔧 技術要件
+      - Google Sheets API連携
+      - CSV/JSON パーサー
+      - Webhook対応
+      - データ検証機能
+
+      ### 📁 主要作業ファイル
+      - `src/services/dataIntegration.js` (新規)
+      - `src/connectors/` (新規ディレクトリ)
+      - `src/connectors/googleSheets.js` (新規)
+      - `src/connectors/csvImporter.js` (新規)
+      - `src/utils/dataValidator.js` (新規)
+
+      ### ✅ 完了条件
+      - Google Sheets双方向同期
+      - CSV/JSON一括インポート
+      - データ検証・エラー処理
+      - 差分更新機能
+
+      TASK-005のAPIインフラを基盤として、堅牢なデータ統合システムを構築してください。
+    technical_notes:
+      - "Google Sheets API v4使用"
+      - "大ファイル処理のストリーミング対応"
+      - "データ型自動推論機能"
+    acceptance_criteria:
+      - "100MB以上のCSVファイル処理可能"
+      - "リアルタイム同期遅延 < 5秒"
+      - "データ整合性検証100%"
+      - "エラー復旧機能完備"
+
+  - id: "TASK-007"
+    title: "Web Dashboard Development"
+    priority: "high"
+    estimate_days: 8
+    status: "todo"
+    category: "user-interface"
+    dependencies: ["TASK-005"]
+    assignee: null
+    worktree: null
+    branch: null
+    started_date: null
+    completed_date: null
+    description: "React-based dashboard, real-time preview"
+    claude_context: |
+      ## 🖥️ タスク: Web Dashboard Development
+
+      ### 📋 実装目標
+      - モダンなReactベースダッシュボード
+      - リアルタイムプレビュー機能
+      - レスポンシブUI/UX
+      - 高性能な状態管理
+
+      ### 🔧 技術要件
+      - React 18 + TypeScript
+      - Material-UI または Tailwind CSS
+      - WebSocket リアルタイム通信
+      - PWA対応
+
+      ### 📁 主要作業ファイル
+      - `src/web/dashboard/` (新規ディレクトリ構成)
+      - `src/web/dashboard/components/` (React Components)
+      - `src/web/dashboard/hooks/` (Custom Hooks)
+      - `src/web/dashboard/services/api.ts` (API連携)
+
+      ### ✅ 完了条件
+      - 直感的なユーザーインターフェース
+      - プレゼンテーション作成ワークフロー
+      - リアルタイムコラボレーション
+      - モバイル完全対応
+
+      TASK-005のAPIを活用して、ユーザーフレンドリーなダッシュボードを作成してください。
+    technical_notes:
+      - "Google Apps Script HTML Serviceとの統合"
+      - "WebSocket代替: Server-Sent Events使用"
+      - "バンドルサイズ最適化 < 500KB"
+    acceptance_criteria:
+      - "初期読み込み時間 < 3秒"
+      - "タブレット・スマホ対応"
+      - "アクセシビリティ AA準拠"
+      - "オフライン機能部分対応"
+
+  # 中優先度タスク
+  - id: "TASK-008"
+    title: "Mobile-Responsive Design"
+    priority: "low"
+    estimate_days: 4
+    status: "todo"
+    category: "user-interface"
+    dependencies: ["TASK-007"]
+    assignee: null
+    worktree: null
+    branch: null
+    started_date: null
+    completed_date: null
+    description: "Mobile optimization, touch interface"
+    claude_context: |
+      ## 📱 タスク: Mobile-Responsive Design
+
+      モバイルデバイス向けの最適化とタッチインターフェースの実装。
+      TASK-007のWebダッシュボードをベースに、モバイルファーストなUXを構築してください。
+
+      ### 重点項目
+      - タッチジェスチャー対応
+      - 縦画面レイアウト最適化
+      - パフォーマンス最適化
+      - オフライン機能拡張
+    technical_notes:
+      - "PWAマニフェスト設定"
+      - "Service Worker実装"
+      - "タッチイベント最適化"
+
+# タスク依存関係マップ
+dependencies:
+  graph: |
+    TASK-001 (Layout Engine) → TASK-002 (Theme System)
+    Core Services → TASK-003 (Mermaid) 
+    Core Services → TASK-004 (Charts)
+    Core Services → TASK-005 (API) → TASK-006 (Data Integration)
+                                   → TASK-007 (Dashboard) → TASK-008 (Mobile)
+
+# 完了済みタスク
+completed_tasks:
+  - id: "TASK-001"
+    title: "Advanced Layout Engine"
+    completed_date: "2025-01-11"
+    assignee: "Claude AI"
+    notes: "CSS Grid システム、レスポンシブエンジン、テンプレートシステム実装完了"
+
+# Claude Code 統合設定
+claude_integration:
+  launch_command: "claude-code --dangerously-skip-permissions"
+  pre_session_script: "./scripts/prepare-claude-session.sh"
+  post_session_script: "./scripts/finalize-claude-session.sh"
+  context_template: |
+    タスク: {task_title}
+    優先度: {priority}
+    推定作業時間: {estimate_days}日
+    
+    {claude_context}
+    
+    ## 🎯 このセッションのゴール
+    上記のタスクを完了してください。実装・テスト・ドキュメント更新を含みます。
+    
+    ## 📁 ワークスペース情報
+    - プロジェクトルート: {workspace_root}
+    - 現在のブランチ: {current_branch}
+    - 依存タスク: {dependencies}
+    
+    質問があれば遠慮なくお聞きください！
